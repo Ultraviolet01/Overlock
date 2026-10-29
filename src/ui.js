@@ -293,7 +293,7 @@ function openHelp(scene, onClose) {
     [() => miniCard(scene, 0, 0, '÷2', COLORS.bad), 'RED CARDS', 'Avoid them. Shooting makes them worse.'],
     [() => scene.add.image(0, 0, 'barrel').setScale(0.9), 'RUNE BARRELS', 'Break one for an upgrade, or it crashes into you.'],
     [() => scene.add.image(0, 0, 'champion').setScale(0.36), 'CHAMPIONS', 'Every 10 knights merge into one champion.'],
-    [() => scene.add.image(0, 0, 'boss').setScale(0.24), 'THE HORROR', 'Comes every 5th wave. Slide out of the red lane before it slams.'],
+    [() => scene.add.image(0, 0, 'boss').setScale(0.24), 'BOSSES', 'Every 5th wave: the Horror, Bone Colossus, Brood Mother, then the Wraith King.'],
   ];
   const top = -440;
   rows.forEach((row, i) => {

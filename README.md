@@ -15,8 +15,30 @@ A portrait, one-thumb horde shooter built for Slapjam AI 2. The jam theme is **S
 - Don't shoot the red `÷` and fire rate trap cards. Shooting makes them worse (`÷2` becomes `÷3`, `-40%` becomes `-50%`).
 - Every 10 knights merge into one champion, so a squad of hundreds stays readable.
 - Rune barrels roll down a lane. Shoot one open for piercing bolts, extra bolt damage or more knights. If you don't break it and it reaches your squad, it crashes into it.
-- The horde speeds up every 15 seconds. Every 5th wave a giant horror charges at you. Kill it before it reaches your knights.
-- The horror marks a red lane where your squad stands, then slams it. Slide out of the lane in time to dodge and gain fire rate.
+- The horde speeds up every 15 seconds and new enemy types join as the waves climb. The first time one appears, its name and a tip show on screen.
+- Every 5th wave a boss charges at you. Kill it before it reaches your knights. Bosses take turns, then repeat tougher.
+
+## The horde
+
+| Enemy | From wave | What it does |
+|---|---|---|
+| Cultist | 1 | Basic walker |
+| Crawler | 2 | Fast. Shoot it early |
+| Brute | 3 | Tough, bites hard |
+| Wraith | 4 | Weaves from side to side across the road |
+| Bloater | 6 | When popped, blasts every enemy around it (can chain) |
+| Shield Skeleton | 7 | Its shield blocks most of each bolt |
+| Necromancer | 9 | Stops partway down the road and raises cultists. Kill it first |
+| Flesh Slime | 11 | Splits into two small slimes when slain |
+
+## Bosses (every 5th wave, in turn)
+
+| Wave | Boss | Attack |
+|---|---|---|
+| 5, 25, 45... | The Horror | Marks a red lane where you stand, then slams it. Slide out in time to dodge and gain fire rate |
+| 10, 30, 50... | Bone Colossus | Marks spots on the road (one under you), then skulls crash down on them |
+| 15, 35, 55... | Brood Mother | Crawlers pour out of her as she comes |
+| 20, 40, 60... | Wraith King | Raises a shield that blocks every bolt and calls wraiths, then drops it. Shoot when it's down |
 - The game is endless. Chase your best wave, top fire rate and score.
 
 ## Captains
@@ -45,7 +67,7 @@ A portrait, one-thumb horde shooter built for Slapjam AI 2. The jam theme is **S
 
 - Phaser 3.80.1, stored in `lib/` so the game needs no internet.
 - Plain JavaScript, no build step.
-- Character art (knight, champion, cultist, crawler, brute, horror, airship) was generated with AI (Higgsfield, Z Image model), then cut out and resized. The knights are drawn from behind, standing straight and holding their crossbows forward up the road, like Last War's soldiers. The files are in `assets/`.
+- Character art (knight, champion, cultist, crawler, brute, wraith, bloater, shield skeleton, necromancer, flesh slime, the four bosses, airship) was generated with AI (Higgsfield, Z Image model), then cut out and resized. The knights are drawn from behind, standing straight and holding their crossbows forward up the road, like Last War's soldiers. The files are in `assets/`.
 - Bolts, road, barrels and effects are drawn in code at startup, and all sound is made with WebAudio.
 - Game size is 720 x 1280 and scales to fit any screen.
 - Font: Lilita One (SIL Open Font License, see `assets/fonts/`), bundled so it works offline.

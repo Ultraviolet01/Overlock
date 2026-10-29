@@ -1,11 +1,53 @@
 // The run itself: squad, horde, gates, barrels, boss, waves, and the speed HUD.
 
 // scale is the sprite's display scale; r is the hit radius in screen pixels.
+// unlock is the first wave a type can appear; weight(w) is its spawn weight.
+// The first time a type shows up in a run, its name and tip are announced.
 const ENEMIES = {
-  walker: { key: 'walker', scale: 0.72, hp: 3, speed: 140, r: 28, bite: 1, pts: 10, gain: 0.025 },
-  sprinter: { key: 'sprinter', scale: 0.66, hp: 1.6, speed: 330, r: 24, bite: 1, pts: 15, gain: 0.04 },
-  brute: { key: 'brute', scale: 0.86, hp: 16, speed: 90, r: 54, bite: 4, pts: 50, gain: 0.12 },
+  walker: { key: 'walker', scale: 0.72, hp: 3, speed: 140, r: 28, bite: 1, pts: 10, gain: 0.025, unlock: 1, weight: () => 60 },
+  sprinter: {
+    key: 'sprinter', scale: 0.66, hp: 1.6, speed: 330, r: 24, bite: 1, pts: 15, gain: 0.04,
+    unlock: 2, weight: (w) => 16 + w * 2, name: 'CRAWLER', tip: 'Fast. Shoot it early',
+  },
+  brute: {
+    key: 'brute', scale: 0.86, hp: 16, speed: 90, r: 54, bite: 4, pts: 50, gain: 0.12, tag: true,
+    unlock: 3, weight: (w) => 6 + w, name: 'BRUTE', tip: 'Tough, and bites hard',
+  },
+  wraith: {
+    key: 'wraith', scale: 0.66, hp: 2.4, speed: 190, r: 26, bite: 1, pts: 20, gain: 0.05, zigzag: true,
+    unlock: 4, weight: (w) => 8 + w, name: 'WRAITH', tip: 'Weaves across the road',
+  },
+  bloater: {
+    key: 'bloater', scale: 0.62, hp: 9, speed: 80, r: 44, bite: 3, pts: 40, gain: 0.1, tag: true, explodes: true,
+    unlock: 6, weight: (w) => 5 + w * 0.6, name: 'BLOATER', tip: 'Pop it to blast the horde around it',
+  },
+  shield: {
+    key: 'shield', scale: 0.72, hp: 8, speed: 110, r: 32, bite: 2, pts: 35, gain: 0.08, tag: true, armor: 0.4,
+    unlock: 7, weight: (w) => 6 + w, name: 'SHIELD SKELETON', tip: 'Its shield blocks most of each bolt',
+  },
+  summoner: {
+    key: 'summoner', scale: 0.7, hp: 10, speed: 75, r: 32, bite: 2, pts: 60, gain: 0.15, tag: true, summons: true,
+    unlock: 9, weight: (w) => 3 + w * 0.3, name: 'NECROMANCER', tip: 'Stops and raises cultists. Kill it first',
+  },
+  splitter: {
+    key: 'splitter', scale: 0.72, hp: 7, speed: 110, r: 36, bite: 2, pts: 30, gain: 0.08, tag: true, splits: true,
+    unlock: 11, weight: (w) => 5 + w * 0.6, name: 'FLESH SLIME', tip: 'Splits in two when slain',
+  },
+  slimelet: { key: 'splitter', scale: 0.4, hp: 2, speed: 170, r: 20, bite: 1, pts: 8, gain: 0.02, unlock: 99, weight: () => 0 },
 };
+
+// Bosses take turns every 5th wave; each has its own attack. width is the
+// display width in screen pixels at the squad line.
+const BOSSES = [
+  { key: 'boss', name: 'THE HORROR', tip: 'Slide out of the red lane before it slams', attack: 'slam', width: 300 },
+  { key: 'colossus', name: 'BONE COLOSSUS', tip: 'Dodge the falling skulls', attack: 'boulders', width: 290 },
+  { key: 'brood', name: 'BROOD MOTHER', tip: 'Her crawlers pour out. Keep firing', attack: 'brood', width: 360 },
+  { key: 'wraithking', name: 'WRAITH KING', tip: 'Shoot when his shield drops', attack: 'shield', width: 280 },
+];
+
+function bossForWave(wave) {
+  return BOSSES[(Math.max(1, Math.round(wave / TUNING.bossEvery)) - 1) % BOSSES.length];
+}
 
 const UNIT = {
   knight: { key: 'knight', scale: 0.56 },
@@ -18,7 +60,6 @@ const MAX_CHAMPIONS = 30;
 const SQUAD_MIN_X = 110;
 const CARD_W = 268;
 const CARD_H = 140;
-const BOSS_SCALE = 0.95;
 const SLAM_HALF_W = 95;
 const MAX_SQUAD_RADIUS = 120; // keeps a big crowd narrow enough to dodge
 
@@ -101,6 +142,8 @@ class GameScene extends Phaser.Scene {
     this.spacing = 26;
     this.champions = 0;
     this.slam = null;
+    this.seen = { walker: true };
+    this.rocks = [];
 
     this.createWorld();
     this.createSquad();
@@ -172,6 +215,7 @@ class GameScene extends Phaser.Scene {
     this.barrels.getChildren().forEach((o) => { add(o, true); add(o.hpText); });
     this.enemies.getChildren().forEach((o) => { add(o, true); add(o.hpText); });
     this.bosses.getChildren().forEach((o) => add(o, true));
+    (this.rocks || []).forEach((r) => add(r.img));
     this.knights.forEach((o) => add(o, true));
     this.bullets.getChildren().forEach((o) => add(o));
     add(this.squadLabel);
@@ -514,6 +558,7 @@ class GameScene extends Phaser.Scene {
       return;
     }
     this.updateTutorial(dt);
+    this.updateAirship(dt);
 
     if (s.slowTimer > 0) s.slowTimer -= dt;
     if (s.surgeTimer > 0) s.surgeTimer -= dt;
@@ -533,7 +578,7 @@ class GameScene extends Phaser.Scene {
     this.updateSquadVisual(dt, eff);
     this.updateFiring(dt, eff);
     this.updateBullets();
-    this.updateEnemies();
+    this.updateEnemies(dt);
     if (s.over) return;
     this.updateBarrels(dt);
     if (s.over) return;
@@ -577,18 +622,9 @@ class GameScene extends Phaser.Scene {
     this.introT += dt;
     const t = this.introT;
     const a = this.airship;
-    if (a) {
-      a.lift = 260 + Math.sin(t * 2.2) * 12;
-      const last = this.drops.length ? this.drops[this.drops.length - 1].start : 0;
-      if (t > last + 0.5) {
-        a.x += 560 * dt;
-        a.y -= 120 * dt;
-        if (a.x > W + 500) {
-          a.destroy();
-          this.airship = null;
-        }
-      }
-    }
+    const last = this.drops.length ? this.drops[this.drops.length - 1].start : 0;
+    if (a && t > last + 0.5) a.leaving = true;
+    this.updateAirship(dt);
 
     let allLanded = true;
     for (const d of this.drops) {
@@ -626,8 +662,25 @@ class GameScene extends Phaser.Scene {
     if (allLanded && this.drops.length) this.finishIntro();
   }
 
+  // Hovers until the drop is done, then flies off to the right and is removed.
+  updateAirship(dt) {
+    const a = this.airship;
+    if (!a) return;
+    if (!a.leaving) {
+      a.lift = 260 + Math.sin(this.introT * 2.2) * 12;
+      return;
+    }
+    a.x += 900 * dt;
+    a.lift += 120 * dt;
+    if (project(a.x, a.y).x > W + 260) {
+      a.destroy();
+      this.airship = null;
+    }
+  }
+
   finishIntro() {
     this.introActive = false;
+    if (this.airship) this.airship.leaving = true;
     this.knights.forEach((k) => { k.lift = 0; });
     this.squadLabel.setVisible(true);
     this.banner('WAVE 1', '#f2c14e', 'Hold the road');
@@ -770,6 +823,14 @@ class GameScene extends Phaser.Scene {
   }
 
   damage(e, dmg) {
+    if (e.isBoss && e.immune) {
+      if (this.elapsed - e.lastNum > 0.3) {
+        this.popNumber(e.x + (Math.random() - 0.5) * 120, e.y - 60, 'IMMUNE', '#7fd3ff', 30);
+        e.lastNum = this.elapsed;
+      }
+      return;
+    }
+    if (e.def && e.def.armor) dmg *= e.def.armor;
     e.hp -= dmg;
     e.dmgAcc += dmg;
     e.hitFlash = 0.05;
@@ -788,12 +849,13 @@ class GameScene extends Phaser.Scene {
 
   // ---------------------------------------------------------------- horde
 
-  spawnEnemy(type, x) {
+  spawnEnemy(type, x, y) {
     const def = ENEMIES[type];
-    const e = this.enemies.get(x, VIEW.far - 40, def.key);
-    if (!e) return;
+    if (y === undefined) y = VIEW.far - 40;
+    const e = this.enemies.get(x, y, def.key);
+    if (!e) return null;
     e.setTexture(def.key);
-    e.enableBody(true, x, VIEW.far - 40, true, true);
+    e.enableBody(true, x, y, true, true);
     e.setScale(def.scale);
     const rt = def.r / def.scale;
     e.setCircle(rt, e.width / 2 - rt, e.height / 2 - rt);
@@ -806,6 +868,20 @@ class GameScene extends Phaser.Scene {
     e.lastNum = 0;
     e.hitFlash = 0;
     e.wobble = Math.random() * Math.PI * 2;
+    e.summonT = 2;
+    if (def.name && !this.seen[type]) {
+      this.seen[type] = true;
+      this.notice('NEW: ' + def.name, def.tip);
+    }
+    return e;
+  }
+
+  // A smaller announcement than a banner, for new enemy types.
+  notice(title, sub) {
+    const t = this.add.text(W / 2, 400, title, textStyle(44, '#ff8a7a', { fontStyle: 'italic' })).setOrigin(0.5).setDepth(58).setAlpha(0);
+    const t2 = this.add.text(W / 2, 450, sub, textStyle(24, '#ffffff')).setOrigin(0.5).setDepth(58).setAlpha(0);
+    this.tweens.add({ targets: [t, t2], alpha: 1, duration: 200 });
+    this.tweens.add({ targets: [t, t2], alpha: 0, delay: 2000, duration: 400, onComplete: () => { t.destroy(); t2.destroy(); } });
   }
 
   updateSpawning(dt) {
@@ -815,11 +891,12 @@ class GameScene extends Phaser.Scene {
     const base = Math.max(0.16, 1.0 / (1 + (w - 1) * 0.28));
     this.spawnTimer = base * (this.s.bossActive ? 2.6 : 1) * (0.7 + Math.random() * 0.6);
 
-    const type = weighted([
-      ['walker', 70],
-      ['sprinter', w >= 2 ? 18 + w * 2 : 0],
-      ['brute', w >= 3 ? 6 + w : 0],
-    ]);
+    const summoners = this.enemies.getChildren().filter((e) => e.active && e.def && e.def.summons).length;
+    const type = weighted(Object.keys(ENEMIES).map((k) => {
+      const d = ENEMIES[k];
+      if (w < d.unlock || (d.summons && summoners >= 2)) return [k, 0];
+      return [k, d.weight(w)];
+    }));
     const x = 130 + Math.random() * (W - 260);
     if (type === 'walker') {
       const n = 1 + Math.floor(Math.random() * Math.min(4, 1 + w * 0.5));
@@ -829,7 +906,7 @@ class GameScene extends Phaser.Scene {
     }
   }
 
-  updateEnemies() {
+  updateEnemies(dt) {
     const mult = this.hordeMult();
     const list = this.enemies.getChildren();
     for (let i = 0; i < list.length; i++) {
@@ -838,13 +915,28 @@ class GameScene extends Phaser.Scene {
         if (e.hpText) e.hpText.setVisible(false);
         continue;
       }
-      if (e.def.key === 'brute') this.hpTag(e, e.y + 34);
-      const vy = e.def.speed * mult;
+      if (e.def.tag) this.hpTag(e, e.y + 34);
+      let vy = e.def.speed * mult;
       let vx;
       if (e.y > 620) {
         vx = clamp((this.squadX - e.x) * 1.3, -170 * mult, 170 * mult);
+      } else if (e.def.zigzag) {
+        vx = Math.sin(this.elapsed * 3.2 + e.wobble) * 230 * mult;
       } else {
         vx = Math.sin(this.elapsed * 2 + e.wobble) * 30;
+      }
+      if (e.def.zigzag && e.x < 110) vx = Math.abs(vx);
+      if (e.def.zigzag && e.x > W - 110) vx = -Math.abs(vx);
+      // The necromancer stops partway down the road and raises cultists.
+      if (e.def.summons && e.y > 320) {
+        vy = 0;
+        vx = Math.sin(this.elapsed + e.wobble) * 40;
+        e.summonT -= dt;
+        if (e.summonT <= 0) {
+          e.summonT = 3.2;
+          this.explode(this.burstRot, 12, e.x, e.y);
+          for (const off of [-50, 50]) this.spawnEnemy('walker', clamp(e.x + off, 110, W - 110), e.y + 30);
+        }
       }
       e.setVelocity(vx, vy);
       e.setFlipX(vx < -20);
@@ -896,8 +988,28 @@ class GameScene extends Phaser.Scene {
     this.s.kills++;
     this.s.score += e.def.pts * Math.ceil(eff);
     this.addSpeed(e.def.gain);
-    this.explode(e.def.key === 'sprinter' ? this.burstRot : this.burstRed, e.def.key === 'brute' ? 26 : 10, e.x, e.y);
+    const green = e.def.key === 'sprinter' || e.def.key === 'wraith' || e.def.key === 'bloater';
+    this.explode(green ? this.burstRot : this.burstRed, e.def.tag ? 26 : 10, e.x, e.y);
     Sfx.kill();
+    if (e.def.explodes) this.blast(e.x, e.y);
+    if (e.def.splits) {
+      for (const off of [-34, 34]) this.spawnEnemy('slimelet', clamp(e.x + off, 110, W - 110), e.y);
+    }
+  }
+
+  // A popped bloater hurts every horde unit near it, which can chain.
+  blast(x, y) {
+    const dmg = 8 * this.waveScale();
+    this.explode(this.burstRot, 50, x, y);
+    this.explode(this.burstGold, 20, x, y);
+    this.shake(160, 0.008);
+    Sfx.noise(0.35, 0.18, 0, 500, 'lowpass');
+    this.enemies.getChildren().forEach((o) => {
+      if (!o.active) return;
+      const dx = o.x - x;
+      const dy = o.y - y;
+      if (dx * dx + dy * dy < 150 * 150) this.damage(o, dmg);
+    });
   }
 
   // ---------------------------------------------------------------- rune barrels
@@ -988,12 +1100,18 @@ class GameScene extends Phaser.Scene {
   // ---------------------------------------------------------------- boss
 
   spawnBoss() {
-    const b = this.bosses.get(W / 2, VIEW.far - 120, 'boss');
+    const def = bossForWave(this.s.wave);
+    const b = this.bosses.get(W / 2, VIEW.far - 120, def.key);
     if (!b) return;
+    b.setTexture(def.key);
     b.enableBody(true, W / 2, VIEW.far - 120, true, true);
-    b.setScale(BOSS_SCALE);
-    const rt = 125 / BOSS_SCALE;
-    b.setCircle(rt, b.width / 2 - rt, b.height / 2 - rt - 20);
+    b.def = def;
+    b.baseScale = def.width / b.width;
+    b.setScale(b.baseScale);
+    const rt = (def.width * 0.42) / b.baseScale;
+    b.setCircle(rt, b.width / 2 - rt, b.height / 2 - rt);
+    b.atkTimer = 2.2;
+    b.immune = false;
     b.setDepth(11).clearTint();
     b.isBoss = true;
     b.isBarrel = false;
@@ -1008,7 +1126,8 @@ class GameScene extends Phaser.Scene {
     this.boss = b;
     this.slam = null;
     this.s.bossActive = true;
-    this.banner('A HORROR APPROACHES', '#e0413a', 'Dodge the red slams');
+    this.rocks = [];
+    this.banner(def.name, '#e0413a', def.tip);
     Sfx.bossRoar();
     this.shake(600, 0.008);
   }
@@ -1025,9 +1144,13 @@ class GameScene extends Phaser.Scene {
     b.setVelocity(Math.sin(this.elapsed * 1.5) * 40, v);
     b.x = clamp(b.x, 190, W - 190);
     this.applyHitFlash(b);
-    b.setScale(BOSS_SCALE * (1 + Math.sin(this.elapsed * 6) * 0.02));
+    b.setScale(b.baseScale * (1 + Math.sin(this.elapsed * 6) * 0.02));
 
-    this.updateSlam(b, dt);
+    this.slamGfx.clear();
+    if (b.def.attack === 'slam') this.updateSlam(b, dt);
+    else if (b.def.attack === 'boulders') this.updateBoulders(b, dt);
+    else if (b.def.attack === 'brood') this.updateBrood(b, dt);
+    else if (b.def.attack === 'shield') this.updateShield(b, dt);
     if (this.s.over || !b.active) return;
 
     const hpRatio = clamp(b.hp / b.maxHp, 0, 1);
@@ -1086,8 +1209,92 @@ class GameScene extends Phaser.Scene {
     }
   }
 
+  // Bone Colossus: marks spots on the road (one under the squad), then skulls
+  // crash down on them. Move off the marked spot.
+  updateBoulders(b, dt) {
+    b.atkTimer -= dt;
+    if (b.atkTimer <= 0) {
+      b.atkTimer = Math.max(1.6, 2.7 - this.s.wave * 0.03);
+      const xs = [this.squadX, 140 + Math.random() * 440, 140 + Math.random() * 440];
+      xs.forEach((x, i) => {
+        const img = this.add.image(x, LINE_Y, 'skull').setScale(2.6).setDepth(33);
+        img.lift = 700;
+        this.rocks.push({ x, y: LINE_Y + (i === 0 ? 0 : (Math.random() - 0.5) * 120), t: 1.1, dur: 1.1, img });
+      });
+      Sfx.tone(240, 0.3, 'sawtooth', 0.07, 0, 120);
+    }
+    const g = this.slamGfx;
+    for (let i = this.rocks.length - 1; i >= 0; i--) {
+      const r = this.rocks[i];
+      r.t -= dt;
+      const k = 1 - Math.max(0, r.t) / r.dur;
+      r.img.setPosition(r.x, r.y);
+      r.img.lift = 700 * (1 - k * k);
+      r.img.setAngle(k * 360);
+      const pts = [];
+      for (let a = 0; a < 24; a++) {
+        const ang = (a / 24) * Math.PI * 2;
+        const p = project(r.x + Math.cos(ang) * 80, r.y + Math.sin(ang) * 60);
+        pts.push(new Phaser.Geom.Point(p.x, p.y));
+      }
+      g.fillStyle(COLORS.horde, 0.2 + k * 0.35);
+      g.fillPoints(pts, true);
+      g.lineStyle(4, COLORS.horde, 0.9);
+      g.strokePoints(pts, true);
+      if (r.t > 0) continue;
+      this.rocks.splice(i, 1);
+      r.img.destroy();
+      this.explode(this.burstGold, 24, r.x, r.y);
+      this.shake(140, 0.01);
+      Sfx.noise(0.3, 0.18, 0, 400, 'lowpass');
+      if (Math.abs(this.squadX - r.x) < 80 + this.squadSpread() * 0.5 && Math.abs(r.y - LINE_Y) < 90) {
+        const lost = Math.ceil(this.s.squad * 0.12) + 2;
+        this.addSpeed(-0.6 * this.hero.hitLoss);
+        this.popNumber(this.squadX, LINE_Y - 250, 'CRUSHED -' + lost, '#e0413a', 40);
+        vibrate(100);
+        Sfx.bite();
+        this.setSquad(this.s.squad - lost);
+        if (this.s.over) return;
+      }
+    }
+  }
+
+  // Brood Mother: crawlers pour out of her as she comes.
+  updateBrood(b, dt) {
+    b.atkTimer -= dt;
+    if (b.atkTimer > 0) return;
+    b.atkTimer = Math.max(1.6, 2.6 - this.s.wave * 0.02);
+    this.explode(this.burstRot, 20, b.x, b.y + 40);
+    for (const off of [-90, 0, 90]) this.spawnEnemy('sprinter', clamp(b.x + off, 110, W - 110), b.y + 60);
+    Sfx.tone(160, 0.25, 'square', 0.06, 0, 90);
+  }
+
+  // Wraith King: raises a shield that blocks every bolt and calls wraiths,
+  // then drops it. Damage only lands while the shield is down.
+  updateShield(b, dt) {
+    b.atkTimer -= dt;
+    if (!b.immune && b.atkTimer <= 0) {
+      b.immune = true;
+      b.atkTimer = 1.8;
+      Sfx.surge();
+      for (const off of [-120, 120]) this.spawnEnemy('wraith', clamp(b.x + off, 110, W - 110), b.y + 40);
+    } else if (b.immune && b.atkTimer <= 0) {
+      b.immune = false;
+      b.atkTimer = Math.max(2.6, 4 - this.s.wave * 0.03);
+    }
+    if (b.immune) {
+      b.setTint(0x7fd3ff);
+      const p = project(b.x, b.y);
+      this.slamGfx.lineStyle(8, 0x7fd3ff, 0.5 + 0.3 * Math.sin(this.elapsed * 12));
+      this.slamGfx.strokeCircle(p.x, p.y, 150 * p.s);
+    }
+  }
+
   endBoss(b) {
     b.disableBody(true, true);
+    b.immune = false;
+    (this.rocks || []).forEach((r) => r.img.destroy());
+    this.rocks = [];
     this.boss = null;
     this.slam = null;
     this.slamGfx.clear();
@@ -1120,7 +1327,7 @@ class GameScene extends Phaser.Scene {
     this.shake(400, 0.015);
     this.cameras.main.flash(150, 255, 220, 140);
     Sfx.bossDown();
-    this.banner('HORROR SLAIN', '#f2c14e', 'Fire rate +1.5');
+    this.banner(b.def.name + ' SLAIN', '#f2c14e', 'Fire rate +1.5');
   }
 
   // ---------------------------------------------------------------- gates
@@ -1423,7 +1630,8 @@ class GameScene extends Phaser.Scene {
     this.scoreStrip.set(this.s.score.toLocaleString('en-US'));
     this.killStrip.set(String(this.s.kills));
     const toBoss = TUNING.bossEvery - (this.s.wave % TUNING.bossEvery);
-    this.bossStrip.set(this.s.bossActive ? 'HORROR ATTACKING' : toBoss === 1 ? 'HORROR NEXT WAVE' : 'HORROR IN ' + toBoss + ' WAVES');
+    const nextName = this.boss && this.boss.def ? this.boss.def.name : bossForWave(this.s.wave + toBoss).name;
+    this.bossStrip.set(this.s.bossActive ? nextName + ' ATTACKING' : toBoss === 1 ? nextName + ' NEXT WAVE' : nextName + ' IN ' + toBoss + ' WAVES');
 
     const status = [];
     if (this.s.slowTimer > 0) status.push('HORDE SLOW ' + Math.ceil(this.s.slowTimer) + 's');
