@@ -90,6 +90,39 @@ function makeTextures(scene) {
     g.fillRect(22, 30, 2, 5);
   });
 
+  // Score badge: blue shield with a gold star.
+  bake('icon_score', 44, 48, (g) => {
+    g.fillStyle(0x0a0f0e, 1);
+    g.fillRoundedRect(2, 2, 40, 30, 8);
+    g.fillTriangle(2, 26, 42, 26, 22, 47);
+    g.fillStyle(0x3d78b8, 1);
+    g.fillRoundedRect(5, 5, 34, 25, 6);
+    g.fillTriangle(5, 26, 39, 26, 22, 43);
+    g.fillStyle(COLORS.gold, 1);
+    const star = [];
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + (i / 10) * Math.PI * 2;
+      const r = i % 2 === 0 ? 13 : 5.5;
+      star.push(new Phaser.Geom.Point(22 + Math.cos(a) * r, 22 + Math.sin(a) * r));
+    }
+    g.fillPoints(star, true);
+  });
+
+  // Flame for the fire rate meter.
+  bake('icon_flame', 52, 64, (g) => {
+    g.fillStyle(0x0a0f0e, 1);
+    g.fillCircle(26, 42, 20);
+    g.fillTriangle(8, 40, 44, 40, 28, 0);
+    g.fillStyle(COLORS.ember, 1);
+    g.fillCircle(26, 42, 16);
+    g.fillTriangle(12, 40, 40, 40, 28, 6);
+    g.fillStyle(COLORS.gold, 1);
+    g.fillCircle(26, 46, 9);
+    g.fillTriangle(18, 46, 34, 46, 27, 22);
+    g.fillStyle(0xfff4c8, 1);
+    g.fillCircle(26, 49, 4);
+  });
+
   bake('dot', 8, 8, (g) => {
     g.fillStyle(0xffffff, 1);
     g.fillCircle(4, 4, 4);

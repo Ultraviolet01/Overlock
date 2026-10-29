@@ -131,9 +131,8 @@ class GameScene extends Phaser.Scene {
       k.phase = Math.random() * Math.PI * 2;
       this.knights.push(k);
     }
-    this.squadLabel = this.add.text(this.squadX, LINE_Y - 90, '', textStyle(46, '#c8f1ff', {
-      stroke: '#0b1412', strokeThickness: 8,
-    })).setOrigin(0.5).setDepth(46);
+    this.squadLabel = this.add.text(this.squadX, LINE_Y - 90, '', textStyle(54, '#ffffff', { fontStyle: 'italic' }))
+      .setOrigin(0.5).setDepth(46);
     this.setSquad(this.s.squad, true);
   }
 
@@ -165,40 +164,60 @@ class GameScene extends Phaser.Scene {
 
     this.numbers = [];
     for (let i = 0; i < 40; i++) {
-      this.numbers.push(this.add.text(0, 0, '', textStyle(28, '#ffffff', { stroke: '#0b1412', strokeThickness: 6 }))
+      this.numbers.push(this.add.text(0, 0, '', textStyle(28, '#ffffff', { fontStyle: 'italic' }))
         .setOrigin(0.5).setDepth(40).setVisible(false));
     }
     this.numberIndex = 0;
   }
 
+  // Last War style HUD: a small cluster in the top-left corner (portrait with a
+  // wave badge, a wave bar, and slim strips), a small pause button, and the
+  // battle everywhere else. Fire rate, the jam theme, gets a big meter at the bottom.
   createHud() {
-    this.gauge = this.add.graphics().setDepth(50);
-    this.speedText = this.add.text(W / 2, 186, 'x1.0', textStyle(52, '#ffffff', { stroke: '#0b1412', strokeThickness: 8 }))
+    const px = 18;
+    const py = 18;
+    const ps = 104;
+    this.hudPortrait = { px, py, ps };
+    const frame = this.add.graphics().setDepth(50);
+    frame.fillStyle(0x0a0f0e, 1);
+    frame.fillRoundedRect(px - 5, py - 5, ps + 10, ps + 10, 14);
+    frame.fillStyle(PANEL_TRIM, 1);
+    frame.fillRoundedRect(px - 2, py - 2, ps + 4, ps + 4, 12);
+    this.add.image(px + ps / 2, py + ps / 2, this.hero.key === 'tank' ? 'portrait_champion' : 'portrait_knight')
+      .setDisplaySize(ps - 4, ps - 4).setDepth(50);
+    const badge = this.add.graphics().setDepth(51);
+    badge.fillStyle(0x0a0f0e, 0.95);
+    badge.fillRoundedRect(px - 5, py + ps - 34, 58, 40, 8);
+    this.waveBadge = this.add.text(px + 24, py + ps - 14, '1', textStyle(30, '#ffffff')).setOrigin(0.5).setDepth(52);
+    this.waveBar = this.add.graphics().setDepth(50);
+    this.waveBarText = this.add.text(px + ps / 2 + 6, py + ps + 22, 'WAVE', textStyle(16, '#ffffff', { strokeThickness: 3 }))
       .setOrigin(0.5).setDepth(51);
-    this.add.text(W / 2, 232, 'FIRE RATE', textStyle(20, COLORS.textDim)).setOrigin(0.5).setDepth(51);
 
-    this.pauseBtn = uiIconButton(this, 56, 58, 'pause', () => this.pauseGame()).setDepth(52);
+    const sx = px + ps + 8;
+    this.scoreStrip = uiStrip(this, sx, py + 24, 'icon_score', 0.8, 28).setDepth(50);
+    this.killStrip = uiStrip(this, sx + 190, py + 24, 'skull', 0.85, 28).setDepth(50);
+    this.bossStrip = uiStrip(this, sx, py + 74, 'skull', 0.85, 22, '#ff8a7a').setDepth(50);
+    this.statusText = this.add.text(px - 2, py + ps + 46, '', textStyle(20, '#4fe0c8', { strokeThickness: 4, lineSpacing: 4 }))
+      .setDepth(51);
 
-    this.waveText = this.add.text(112, 22, 'WAVE 1', textStyle(34, '#f2c14e', { stroke: '#0b1412', strokeThickness: 6 })).setDepth(51);
-    this.waveBar = this.add.graphics().setDepth(51);
-    this.bossNext = this.add.text(112, 86, '', textStyle(18, '#e0413a', { stroke: '#0b1412', strokeThickness: 4 })).setDepth(51);
-    this.statusText = this.add.text(24, 130, '', textStyle(22, '#4fe0c8', { stroke: '#0b1412', strokeThickness: 5 })).setDepth(51);
+    this.pauseBtn = uiIconButton(this, W - 52, 54, 'pause', () => this.pauseGame(), 72).setDepth(52);
 
-    this.scoreText = this.add.text(W - 28, 22, '0', textStyle(34, COLORS.text, { stroke: '#0b1412', strokeThickness: 6 }))
-      .setOrigin(1, 0).setDepth(51);
-    const best = Store.get('best', null);
-    this.add.text(W - 28, 66, best ? 'BEST ' + best.score : 'SCORE', textStyle(18, COLORS.textDim))
-      .setOrigin(1, 0).setDepth(51);
-
+    // Boss bar: a huge outlined number sitting on a fat red bar.
     this.bossBar = this.add.graphics().setDepth(51);
-    this.bossSkull = this.add.image(112, 295, 'skull').setScale(1.15).setDepth(52).setVisible(false);
-    this.bossLabel = this.add.text(W / 2, 268, '', textStyle(22, '#e0413a', { stroke: '#0b1412', strokeThickness: 5 }))
-      .setOrigin(0.5).setDepth(51);
+    this.bossNum = this.add.text(W / 2, 214, '', textStyle(72, '#ffffff', { fontStyle: 'italic' }))
+      .setOrigin(0.5).setDepth(52).setVisible(false);
+
+    // Fire rate meter at the bottom: flame, big slanted number, fat bar.
+    this.fireBar = this.add.graphics().setDepth(50);
+    this.add.image(46, H - 70, 'icon_flame').setScale(1.2).setDepth(52);
+    this.speedText = this.add.text(84, H - 104, 'x1.0', textStyle(60, '#ffffff', { fontStyle: 'italic' }))
+      .setOrigin(0, 0.5).setDepth(52);
+    this.add.text(470, H - 104, 'FIRE RATE', textStyle(20, '#ffffff', { strokeThickness: 4 })).setOrigin(1, 0.5).setDepth(52);
 
     if (this.hero.ability === 'surge') {
       this.surgeBtn = this.add.container(W - 92, H - 92).setDepth(52);
       this.surgeGfx = this.add.graphics();
-      this.surgeText = this.add.text(0, 0, 'SURGE', textStyle(24, '#ffffff')).setOrigin(0.5);
+      this.surgeText = this.add.text(0, 0, 'SURGE', textStyle(28, '#ffffff')).setOrigin(0.5);
       this.surgeBtn.add([this.surgeGfx, this.surgeText]);
       this.surgeBtn.setSize(150, 150);
       this.surgeBtn.setInteractive({ useHandCursor: true });
@@ -296,7 +315,7 @@ class GameScene extends Phaser.Scene {
     const singles = Math.min(MERGE_SIZE - 1, n - champs * MERGE_SIZE);
     if (!silent && champs > this.champions) {
       this.burstBlue.explode(24, this.squadX, LINE_Y - 20);
-      this.popNumber(this.squadX, LINE_Y - 200, 'CHAMPION RISES', '#4fc3ff', 30);
+      this.popNumber(this.squadX, LINE_Y - 290, 'CHAMPION RISES', '#4fc3ff', 30);
     }
     this.champions = champs;
     this.units = champs + singles;
@@ -535,7 +554,11 @@ class GameScene extends Phaser.Scene {
     const list = this.enemies.getChildren();
     for (let i = 0; i < list.length; i++) {
       const e = list[i];
-      if (!e.active) continue;
+      if (!e.active) {
+        if (e.hpText) e.hpText.setVisible(false);
+        continue;
+      }
+      if (e.def.key === 'brute') this.hpTag(e, e.y + 34);
       const vy = e.def.speed * mult;
       let vx;
       if (e.y > 620) {
@@ -549,6 +572,14 @@ class GameScene extends Phaser.Scene {
       if (e.y >= LINE_Y - 30) this.bite(e);
       if (this.s.over) return;
     }
+  }
+
+  // Health painted right on the object as a big outlined number.
+  hpTag(o, y) {
+    if (!o.hpText) {
+      o.hpText = this.add.text(0, 0, '', textStyle(30, '#ffffff', { fontStyle: 'italic' })).setOrigin(0.5).setDepth(35);
+    }
+    o.hpText.setVisible(true).setPosition(o.x, y).setText(String(Math.max(1, Math.ceil(o.hp))));
   }
 
   applyHitFlash(e) {
@@ -565,7 +596,7 @@ class GameScene extends Phaser.Scene {
     e.disableBody(true, true);
     this.addSpeed(-0.3 * e.def.bite * this.hero.hitLoss);
     this.burstRed.explode(14, e.x, LINE_Y - 10);
-    this.popNumber(this.squadX, LINE_Y - 130, '-' + lost, '#e0413a', 40);
+    this.popNumber(this.squadX, LINE_Y - 230, '-' + lost, '#e0413a', 40);
     this.shake(120, 0.006);
     this.cameras.main.flash(80, 120, 20, 20);
     Sfx.bite();
@@ -617,7 +648,11 @@ class GameScene extends Phaser.Scene {
     const list = this.barrels.getChildren();
     for (let i = 0; i < list.length; i++) {
       const b = list[i];
-      if (!b.active) continue;
+      if (!b.active) {
+        if (b.hpText) b.hpText.setVisible(false);
+        continue;
+      }
+      this.hpTag(b, b.y + 4);
       b.setVelocity(0, fall);
       b.setAngle(Math.sin(this.elapsed * 4 + b.x) * 8);
       this.applyHitFlash(b);
@@ -636,7 +671,7 @@ class GameScene extends Phaser.Scene {
     b.disableBody(true, true);
     const lost = Math.ceil(this.s.squad * 0.15) + 2;
     this.burstGold.explode(30, b.x, LINE_Y - 20);
-    this.popNumber(this.squadX, LINE_Y - 150, 'BARREL CRASH -' + lost, '#e0413a', 36);
+    this.popNumber(this.squadX, LINE_Y - 250, 'BARREL CRASH -' + lost, '#e0413a', 36);
     vibrate(80);
     this.shake(200, 0.01);
     Sfx.bite();
@@ -703,8 +738,7 @@ class GameScene extends Phaser.Scene {
     if (!b || !b.active) {
       this.bossBar.clear();
       this.slamGfx.clear();
-      this.bossLabel.setText('');
-      this.bossSkull.setVisible(false);
+      this.bossNum.setVisible(false);
       return;
     }
     const v = (b.endY - b.startY) / TUNING.bossTime * (this.s.slowTimer > 0 ? 0.45 : 1);
@@ -718,15 +752,7 @@ class GameScene extends Phaser.Scene {
 
     const hpRatio = clamp(b.hp / b.maxHp, 0, 1);
     const reach = clamp((b.y - b.startY) / (b.endY - b.startY), 0, 1);
-    this.bossBar.clear();
-    this.bossBar.fillStyle(0x0a1310, 0.85);
-    this.bossBar.fillRoundedRect(110, 284, W - 220, 22, 8);
-    this.bossBar.fillStyle(COLORS.horde, 1);
-    this.bossBar.fillRoundedRect(112, 286, (W - 224) * hpRatio, 18, 7);
-    this.bossBar.fillStyle(COLORS.gold, 1);
-    this.bossBar.fillRect(110, 312, (W - 220) * (1 - reach), 5);
-    this.bossLabel.setText('HORROR  ' + Math.ceil(b.hp));
-    this.bossSkull.setVisible(true);
+    this.drawBossBar(hpRatio, reach, b.hp);
 
     if (b.y >= b.endY) this.bossSmash(b);
   }
@@ -764,13 +790,13 @@ class GameScene extends Phaser.Scene {
     if (Math.abs(this.squadX - sl.x) < SLAM_HALF_W + this.squadSpread() * 0.4) {
       const lost = Math.ceil(this.s.squad * 0.2) + 2;
       this.addSpeed(-0.8 * this.hero.hitLoss);
-      this.popNumber(this.squadX, LINE_Y - 150, 'SLAMMED -' + lost, '#e0413a', 40);
+      this.popNumber(this.squadX, LINE_Y - 250, 'SLAMMED -' + lost, '#e0413a', 40);
       vibrate(120);
       Sfx.bite();
       this.setSquad(this.s.squad - lost);
     } else {
       this.addSpeed(0.4);
-      this.popNumber(this.squadX, LINE_Y - 150, 'DODGED  +SPEED', '#4fe0c8', 36);
+      this.popNumber(this.squadX, LINE_Y - 250, 'DODGED  +SPEED', '#4fe0c8', 36);
     }
   }
 
@@ -787,7 +813,7 @@ class GameScene extends Phaser.Scene {
     const lost = Math.ceil(this.s.squad * 0.5) + 3;
     this.addSpeed(-2 * this.hero.hitLoss);
     this.burstRed.explode(60, this.squadX, LINE_Y - 40);
-    this.popNumber(this.squadX, LINE_Y - 150, '-' + lost, '#e0413a', 56);
+    this.popNumber(this.squadX, LINE_Y - 250, '-' + lost, '#e0413a', 56);
     this.shake(500, 0.02);
     this.cameras.main.flash(200, 160, 20, 20);
     Sfx.bite();
@@ -840,8 +866,8 @@ class GameScene extends Phaser.Scene {
       c.shootable = p.kind === 'add' || p.kind === 'div' || p.kind === 'trap';
       c.startValue = p.value || 0;
       c.bg = this.add.graphics();
-      c.label = this.add.text(0, -14, '', textStyle(56, '#ffffff', { stroke: '#0b1412', strokeThickness: 8 })).setOrigin(0.5);
-      c.sub = this.add.text(0, 42, '', textStyle(18, COLORS.text)).setOrigin(0.5);
+      c.label = this.add.text(0, -12, '', textStyle(68, '#ffffff', { fontStyle: 'italic' })).setOrigin(0.5);
+      c.sub = this.add.text(0, 52, '', textStyle(18, '#ffffff', { strokeThickness: 4 })).setOrigin(0.5);
       c.add([c.bg, c.label, c.sub]);
       this.drawCard(c);
       row.cards.push(c);
@@ -853,39 +879,37 @@ class GameScene extends Phaser.Scene {
     switch (g.kind) {
       case 'add': {
         const v = Math.round(g.value);
-        return { text: (v >= 0 ? '+' : '') + v, sub: 'KNIGHTS  |  SHOOT: UP', color: v > 0 ? COLORS.gold : COLORS.bad };
+        return { text: (v >= 0 ? '+' : '') + v, sub: 'KNIGHTS', color: v > 0 ? COLORS.gold : COLORS.bad };
       }
       case 'mul': return { text: 'x' + g.value, sub: 'KNIGHTS', color: COLORS.gold };
-      case 'div': return { text: '÷' + g.value, sub: 'KNIGHTS  |  SHOOT: WORSE', color: COLORS.bad };
+      case 'div': return { text: '÷' + g.value, sub: 'KNIGHTS', color: COLORS.bad };
       case 'fire': return { text: 'x2', sub: 'FIRE RATE', color: COLORS.speedGate };
-      case 'trap': return { text: '-' + g.pct + '%', sub: 'FIRE RATE  |  SHOOT: WORSE', color: COLORS.bad };
+      case 'trap': return { text: '-' + g.pct + '%', sub: 'FIRE RATE', color: COLORS.bad };
       case 'bolt': return { text: '+50%', sub: 'BOLT SPEED', color: COLORS.speedGate };
       case 'slow': return { text: 'SLOW', sub: 'HORDE 5s', color: COLORS.speedGate };
     }
     return { text: '?', sub: '', color: COLORS.gold };
   }
 
+  // Glassy see-through gate panel, tinted gold (good), red (bad) or teal
+  // (speed), with a big white slanted number, like Last War's gates.
   drawCard(c) {
     const info = this.cardInfo(c.gate);
     const g = c.bg;
     const hw = CARD_W / 2;
     const hh = CARD_H / 2;
     g.clear();
-    g.fillStyle(0x0e1916, 0.82);
-    g.fillRoundedRect(-hw, -hh, CARD_W, CARD_H, 14);
-    g.fillStyle(info.color, 0.16);
-    g.fillRoundedRect(-hw, -hh, CARD_W, CARD_H, 14);
-    g.lineStyle(4, info.color, 1);
-    g.strokeRoundedRect(-hw, -hh, CARD_W, CARD_H, 14);
-    g.lineStyle(2, info.color, 0.6);
-    g.strokeRoundedRect(-hw + 8, -hh + 8, CARD_W - 16, CARD_H - 16, 10);
-    g.fillStyle(info.color, 1);
-    [[-hw + 18, -hh + 18], [hw - 18, -hh + 18], [-hw + 18, hh - 18], [hw - 18, hh - 18]].forEach((p) => {
-      g.fillTriangle(p[0], p[1] - 6, p[0] + 6, p[1], p[0], p[1] + 6);
-      g.fillTriangle(p[0], p[1] - 6, p[0] - 6, p[1], p[0], p[1] + 6);
-    });
+    g.fillStyle(0x0a0f0e, 0.9);
+    g.fillRoundedRect(-hw - 4, -hh - 4, CARD_W + 8, CARD_H + 8, 16);
+    g.fillStyle(info.color, 0.72);
+    g.fillRoundedRect(-hw, -hh, CARD_W, CARD_H, 12);
+    g.fillStyle(darken(info.color, 35), 0.55);
+    g.fillRoundedRect(-hw, hh - 30, CARD_W, 30, { tl: 0, tr: 0, bl: 12, br: 12 });
+    g.fillStyle(0xffffff, 0.22);
+    g.fillRoundedRect(-hw + 8, -hh + 7, CARD_W - 16, CARD_H * 0.32, 10);
+    g.lineStyle(4, 0xffffff, 0.8);
+    g.strokeRoundedRect(-hw, -hh, CARD_W, CARD_H, 12);
     c.label.setText(info.text);
-    c.label.setColor('#' + info.color.toString(16).padStart(6, '0'));
     c.sub.setText(info.sub);
     c.shownText = info.text;
   }
@@ -976,7 +1000,7 @@ class GameScene extends Phaser.Scene {
         break;
     }
     if (s.over) return;
-    this.popNumber(this.squadX, LINE_Y - 160, msg, good ? '#f2c14e' : '#e0413a', 44);
+    this.popNumber(this.squadX, LINE_Y - 260, msg, good ? '#f2c14e' : '#e0413a', 44);
     if (good) {
       this.burstGold.explode(30, this.squadX, LINE_Y - 20);
       Sfx.gateGood();
@@ -1045,17 +1069,17 @@ class GameScene extends Phaser.Scene {
     const t = this.numbers[this.numberIndex];
     this.numberIndex = (this.numberIndex + 1) % this.numbers.length;
     this.tweens.killTweensOf(t);
-    t.setText(str).setColor(color).setFontSize(size).setPosition(x, y).setAlpha(1).setScale(1.3).setVisible(true);
+    t.setText(str).setColor(color).setFontSize(size).setStroke('#0a0f0e', Math.max(4, Math.round(size * 0.16))).setPosition(x, y).setAlpha(1).setScale(1.3).setVisible(true);
     this.tweens.add({ targets: t, scale: 1, duration: 120, ease: 'Back.easeOut' });
     this.tweens.add({ targets: t, y: y - 70, alpha: 0, delay: 250, duration: 500, onComplete: () => t.setVisible(false) });
   }
 
   banner(title, color, subtitle) {
-    const t = this.add.text(W / 2, 520, title, textStyle(70, color, { stroke: '#0b1412', strokeThickness: 10 }))
+    const t = this.add.text(W / 2, 520, title, textStyle(76, color, { fontStyle: 'italic' }))
       .setOrigin(0.5).setDepth(60).setScale(0.4).setAlpha(0);
     const parts = [t];
     if (subtitle) {
-      parts.push(this.add.text(W / 2, 590, subtitle, textStyle(28, COLORS.text, { stroke: '#0b1412', strokeThickness: 6 }))
+      parts.push(this.add.text(W / 2, 590, subtitle, textStyle(30, '#ffffff'))
         .setOrigin(0.5).setDepth(60).setAlpha(0));
     }
     this.tweens.add({ targets: t, scale: 1, alpha: 1, duration: 260, ease: 'Back.easeOut' });
@@ -1064,51 +1088,49 @@ class GameScene extends Phaser.Scene {
   }
 
   updateHud(eff) {
-    const g = this.gauge;
-    const cx = W / 2;
-    const cy = 120;
-    const r = 82;
-    const a0 = Phaser.Math.DegToRad(135);
-    const a1 = Phaser.Math.DegToRad(405);
     const ratio = clamp((eff - 1) / (TUNING.maxSpeed - 1), 0, 1);
     const color = ratio < 0.5
       ? lerpColor(COLORS.knight, COLORS.gold, ratio * 2)
       : lerpColor(COLORS.gold, COLORS.ember, (ratio - 0.5) * 2);
-    g.clear();
-    g.fillStyle(0x0a1310, 0.75);
-    g.fillCircle(cx, cy, r + 22);
-    g.lineStyle(18, 0x1d2a26, 1);
-    g.beginPath();
-    g.arc(cx, cy, r, a0, a1, false);
-    g.strokePath();
-    g.lineStyle(14, color, 1);
-    g.beginPath();
-    g.arc(cx, cy, r, a0, a0 + (a1 - a0) * Math.max(0.01, ratio), false);
-    g.strokePath();
-    for (let i = 0; i <= 9; i++) {
-      const a = a0 + (a1 - a0) * (i / 9);
-      g.lineStyle(3, 0x8fa8a0, 0.7);
-      g.lineBetween(cx + Math.cos(a) * (r + 12), cy + Math.sin(a) * (r + 12), cx + Math.cos(a) * (r + 19), cy + Math.sin(a) * (r + 19));
-    }
-    const na = a0 + (a1 - a0) * ratio + Math.sin(this.elapsed * 40) * 0.01 * eff;
-    g.lineStyle(5, 0xffffff, 1);
-    g.lineBetween(cx, cy, cx + Math.cos(na) * (r - 16), cy + Math.sin(na) * (r - 16));
-    g.fillStyle(color, 1);
-    g.fillCircle(cx, cy, 9);
 
+    // Fire rate meter.
+    const fb = this.fireBar;
+    const bx = 40;
+    const by = H - 72;
+    const bw = 440;
+    const bh = 34;
+    fb.clear();
+    fb.fillStyle(0x0a0f0e, 1);
+    fb.fillRoundedRect(bx - 4, by - 4, bw + 8, bh + 8, (bh + 8) / 2);
+    fb.fillStyle(0x1b1f1e, 1);
+    fb.fillRoundedRect(bx, by, bw, bh, bh / 2);
+    const fw = Math.max(bh, bw * Math.max(0.04, ratio));
+    fb.fillStyle(darken(color, 25), 1);
+    fb.fillRoundedRect(bx, by, fw, bh, bh / 2);
+    fb.fillStyle(color, 1);
+    fb.fillRoundedRect(bx, by, fw, bh - 8, (bh - 8) / 2);
+    fb.fillStyle(0xffffff, 0.3);
+    fb.fillRoundedRect(bx + 8, by + 4, Math.max(0, fw - 16), 8, 4);
     this.speedText.setText('x' + eff.toFixed(1));
-    this.speedText.setColor('#' + color.toString(16).padStart(6, '0'));
-    this.speedText.setScale(1 + ratio * 0.15 + (this.s.surgeTimer > 0 ? 0.1 : 0));
+    this.speedText.setScale(1 + ratio * 0.12 + (this.s.surgeTimer > 0 ? 0.1 : 0));
 
-    this.waveText.setText('WAVE ' + this.s.wave);
-    this.waveBar.clear();
-    this.waveBar.fillStyle(0x0a1310, 0.85);
-    this.waveBar.fillRoundedRect(112, 66, 170, 12, 6);
-    this.waveBar.fillStyle(COLORS.gold, 1);
-    this.waveBar.fillRoundedRect(112, 66, Math.max(12, 170 * (this.s.bossActive ? 1 : this.s.waveTime / TUNING.waveLength)), 12, 6);
+    // Top-left cluster.
+    const { px, py, ps } = this.hudPortrait;
+    this.waveBadge.setText(String(this.s.wave));
+    const wb = this.waveBar;
+    const wy = py + ps + 12;
+    const wp = this.s.bossActive ? 1 : this.s.waveTime / TUNING.waveLength;
+    wb.clear();
+    wb.fillStyle(0x0a0f0e, 1);
+    wb.fillRoundedRect(px - 4, wy - 3, ps + 8, 26, 8);
+    wb.fillStyle(0x1b1f1e, 1);
+    wb.fillRoundedRect(px - 1, wy, ps + 2, 20, 6);
+    wb.fillStyle(0x5fd35a, 1);
+    wb.fillRoundedRect(px - 1, wy, Math.max(10, (ps + 2) * wp), 20, 6);
+    this.scoreStrip.set(this.s.score.toLocaleString('en-US'));
+    this.killStrip.set(String(this.s.kills));
     const toBoss = TUNING.bossEvery - (this.s.wave % TUNING.bossEvery);
-    this.bossNext.setText(this.s.bossActive ? 'HORROR ATTACKING' : toBoss === 1 ? 'HORROR NEXT WAVE' : 'HORROR IN ' + toBoss + ' WAVES');
-    this.scoreText.setText(String(this.s.score));
+    this.bossStrip.set(this.s.bossActive ? 'HORROR ATTACKING' : toBoss === 1 ? 'HORROR NEXT WAVE' : 'HORROR IN ' + toBoss + ' WAVES');
 
     const status = [];
     if (this.s.slowTimer > 0) status.push('HORDE SLOW ' + Math.ceil(this.s.slowTimer) + 's');
@@ -1122,18 +1144,46 @@ class GameScene extends Phaser.Scene {
       const ready = this.s.surgeCd <= 0;
       const sg = this.surgeGfx;
       sg.clear();
-      sg.fillStyle(0x0e1916, 0.9);
-      sg.fillCircle(0, 0, 70);
-      sg.lineStyle(6, ready ? COLORS.knight : 0x3a4a46, 1);
-      sg.strokeCircle(0, 0, 70);
+      sg.fillStyle(0x0a0f0e, 1);
+      sg.fillCircle(0, 0, 74);
+      sg.fillStyle(ready ? BTN_BLUE : 0x2a3331, 1);
+      sg.fillCircle(0, 0, 68);
+      sg.fillStyle(0xffffff, ready ? 0.25 : 0.08);
+      sg.fillEllipse(0, -30, 100, 40);
       if (!ready) {
-        sg.lineStyle(6, COLORS.knight, 1);
+        sg.lineStyle(8, COLORS.knight, 1);
         sg.beginPath();
-        sg.arc(0, 0, 70, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - this.s.surgeCd / 20), false);
+        sg.arc(0, 0, 68, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - this.s.surgeCd / 20), false);
         sg.strokePath();
       }
-      this.surgeText.setColor(ready ? '#ffffff' : '#5f6f6a');
+      this.surgeText.setColor(ready ? '#ffffff' : '#7d8b88');
     }
+  }
+
+  drawBossBar(hpRatio, reach, hp) {
+    const g = this.bossBar;
+    const bx = 100;
+    const by = 230;
+    const bw = W - 200;
+    const bh = 42;
+    g.clear();
+    g.fillStyle(0x0a0f0e, 1);
+    g.fillRoundedRect(bx - 5, by - 5, bw + 10, bh + 10, (bh + 10) / 2);
+    g.fillStyle(0x111414, 1);
+    g.fillRoundedRect(bx, by, bw, bh, bh / 2);
+    const fw = Math.max(bh, bw * hpRatio);
+    g.fillStyle(0xb8260f, 1);
+    g.fillRoundedRect(bx, by, fw, bh, bh / 2);
+    g.fillStyle(0xff4a1c, 1);
+    g.fillRoundedRect(bx, by, fw, bh - 10, (bh - 10) / 2);
+    g.fillStyle(0xffffff, 0.25);
+    g.fillRoundedRect(bx + 10, by + 5, Math.max(0, fw - 20), 9, 4);
+    // How close the horror is to the squad.
+    g.fillStyle(0x0a0f0e, 1);
+    g.fillRoundedRect(bx + 40, by + bh + 10, bw - 80, 12, 6);
+    g.fillStyle(COLORS.gold, 1);
+    g.fillRoundedRect(bx + 42, by + bh + 12, Math.max(8, (bw - 84) * (1 - reach)), 8, 4);
+    this.bossNum.setText(String(Math.ceil(hp))).setVisible(true);
   }
 
   // ---------------------------------------------------------------- end

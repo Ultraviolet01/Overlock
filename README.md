@@ -27,10 +27,10 @@ A portrait, one-thumb horde shooter built for Slapjam AI 2. The jam theme is **S
 
 ## Screens and settings
 
-- **Title:** settings gear (top left), how to play (top right), best run card, captain picker, big PLAY button.
+- **Title:** gradient logo, settings gear (top left), how to play (top right), best run card, captain portraits, big PLAY button.
 - **How to play:** an illustrated guide to steering, fire rate, cards, barrels, champions and the horror. It opens on the first launch.
 - **Settings:** music and sound effect volume, vibration, screen shake, reset best run, and the version number. Reachable from the title and the pause menu.
-- **In game:** pause button (top left), wave and wave progress, how many waves until the next horror, the fire rate gauge, score and best score. During a boss, a skull health bar.
+- **In game (Last War style):** a small cluster in the top-left corner (captain portrait with the wave number, a wave progress bar, score and kill strips, and how many waves until the next horror), a small pause button top right, and a big fire rate meter at the bottom. During a boss, a huge outlined health number on a fat red bar. Gates are glassy panels with a big number, and brutes and barrels show their health right on them.
 - **Pause menu:** resume, how to play, settings, quit to title. The game also pauses by itself when you switch apps or tabs.
 - **End screen:** progress bar to the next horror, six stat cards, RUN AGAIN and CHANGE CAPTAIN.
 
@@ -46,6 +46,7 @@ A portrait, one-thumb horde shooter built for Slapjam AI 2. The jam theme is **S
 - Character art (knight, champion, cultist, crawler, brute, horror) was generated with AI (Higgsfield, Z Image model), then cut out and resized. The files are in `assets/`.
 - Bolts, road, barrels and effects are drawn in code at startup, and all sound is made with WebAudio.
 - Game size is 720 x 1280 and scales to fit any screen.
+- Font: Lilita One (SIL Open Font License, see `assets/fonts/`), bundled so it works offline.
 
 ## Run it locally
 

@@ -142,11 +142,18 @@ function weighted(entries) {
   return entries[entries.length - 1][0];
 }
 
+const FONT = '"Lilita One", "Arial Black", sans-serif';
+
+// Every label uses one heavy rounded font with a thick dark outline and a
+// hard drop shadow, so numbers read clearly over the battle.
 function textStyle(size, color, extra) {
   return Object.assign({
-    fontFamily: 'Georgia, "Times New Roman", serif',
+    fontFamily: FONT,
     fontSize: size + 'px',
     color: color || COLORS.text,
-    fontStyle: 'bold',
+    stroke: '#0a0f0e',
+    strokeThickness: Math.max(3, Math.round(size * 0.16)),
+    shadow: { offsetX: 0, offsetY: Math.max(2, Math.round(size * 0.07)), color: '#000000', blur: 0, fill: true, stroke: true },
+    padding: { x: 4, y: 4 },
   }, extra || {});
 }
