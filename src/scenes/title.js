@@ -59,7 +59,7 @@ class TitleScene extends Phaser.Scene {
     bg.fillRoundedRect(-300, -60, 600, 120, 16);
     bg.lineStyle(3, COLORS.knight, 0.8);
     bg.strokeRoundedRect(-300, -60, 600, 120, 16);
-    const icon = this.add.image(-240, 0, hero.key === 'tank' ? 'champion' : 'knight').setScale(hero.key === 'tank' ? 0.45 : 0.55);
+    const icon = this.add.image(-240, 0, hero.key === 'tank' ? 'champion' : 'knight').setScale(hero.key === 'tank' ? 0.45 : 0.5);
     const name = this.add.text(-180, -30, hero.name, textStyle(36, '#c8f1ff'));
     const role = this.add.text(-180, 14, hero.role, textStyle(22, COLORS.textDim, { fontStyle: 'normal' }));
     card.add([bg, icon, name, role]);
