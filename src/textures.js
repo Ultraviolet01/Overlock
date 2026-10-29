@@ -140,6 +140,49 @@ function makeTextures(scene) {
     layer(56, 50, 54, 0x1d4731);
   });
 
+  // Parachute canopy for the opening drop: dark cloth dome with a blue rune.
+  bake('chute', 150, 124, (g) => {
+    const dome = (rx, ry, cy) => {
+      const pts = [];
+      for (let i = 0; i <= 24; i++) {
+        const a = Math.PI + (i / 24) * Math.PI;
+        pts.push(new Phaser.Geom.Point(75 + Math.cos(a) * rx, cy + Math.sin(a) * ry));
+      }
+      return pts;
+    };
+    g.lineStyle(3, 0x0a0f0e, 1);
+    [12, 48, 102, 138].forEach((x) => g.lineBetween(x, 60, 75, 122));
+    g.fillStyle(0x0a0f0e, 1);
+    g.fillPoints(dome(75, 58, 62), true);
+    g.fillStyle(0x3b4250, 1);
+    g.fillPoints(dome(69, 52, 59), true);
+    g.fillStyle(0x4d5666, 1);
+    g.fillPoints(dome(32, 48, 59), true);
+    g.fillStyle(COLORS.knight, 1);
+    g.fillTriangle(75, 18, 87, 34, 75, 50);
+    g.fillTriangle(75, 18, 63, 34, 75, 50);
+    g.fillStyle(0xffffff, 1);
+    g.fillTriangle(75, 26, 80, 34, 75, 42);
+    g.fillTriangle(75, 26, 70, 34, 75, 42);
+  });
+
+  bake('shadow', 80, 30, (g) => {
+    g.fillStyle(0x000000, 0.4);
+    g.fillEllipse(40, 15, 80, 30);
+  });
+
+  // Pointing hand for the swipe tutorial.
+  bake('hand', 70, 96, (g) => {
+    g.fillStyle(0x0a0f0e, 1);
+    g.fillRoundedRect(22, 0, 24, 62, 12);
+    g.fillRoundedRect(8, 40, 56, 54, 18);
+    g.fillStyle(0xf6dcb8, 1);
+    g.fillRoundedRect(26, 4, 16, 58, 8);
+    g.fillRoundedRect(12, 44, 48, 46, 15);
+    g.fillStyle(0xe2bf95, 1);
+    g.fillRoundedRect(14, 74, 44, 14, 7);
+  });
+
   bake('dot', 8, 8, (g) => {
     g.fillStyle(0xffffff, 1);
     g.fillCircle(4, 4, 4);

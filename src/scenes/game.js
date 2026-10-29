@@ -112,7 +112,7 @@ class GameScene extends Phaser.Scene {
     Music.start();
     this.events.once('shutdown', () => Music.stop());
 
-    this.banner('DRAG TO STEER', '#c8f1ff', 'Shoot gold cards to raise them');
+    this.startIntro();
   }
 
   // ---------------------------------------------------------------- setup
@@ -161,7 +161,7 @@ class GameScene extends Phaser.Scene {
       o._w = [o.x, o.y, o.scaleX, o.scaleY];
       const p = project(o.x, o.y);
       o.x = p.x;
-      o.y = p.y;
+      o.y = p.y - (o.lift || 0) * p.s;
       o.setScale(o._w[2] * p.s, o._w[3] * p.s);
       if (depthFromY) o.setDepth(10 + (o._w[1] + 1000) / 10000);
     };
@@ -175,6 +175,13 @@ class GameScene extends Phaser.Scene {
     this.knights.forEach((o) => add(o, true));
     this.bullets.getChildren().forEach((o) => add(o));
     add(this.squadLabel);
+    if (this.airship) add(this.airship);
+    if (this.drops) {
+      this.drops.forEach((d) => {
+        if (d.shadow) add(d.shadow);
+        if (d.chute) add(d.chute);
+      });
+    }
   }
 
   restoreAll() {
@@ -371,6 +378,7 @@ class GameScene extends Phaser.Scene {
     this.input.on('pointermove', (p) => {
       if (!this.drag || p.id !== this.drag.id || !p.isDown) return;
       this.targetX = this.clampSquadX(this.drag.sx + (p.x - this.drag.px) * 1.25);
+      if (this.tutorial) this.tutorial.moved += Math.abs(p.x - p.prevPosition.x);
     });
     this.input.on('pointerup', (p) => {
       if (this.drag && p.id === this.drag.id) this.drag = null;
@@ -499,6 +507,14 @@ class GameScene extends Phaser.Scene {
       return;
     }
 
+    if (this.introActive) {
+      this.updateIntro(dt);
+      this.updateSpeedFx(dt, 1);
+      this.updateHud(1);
+      return;
+    }
+    this.updateTutorial(dt);
+
     if (s.slowTimer > 0) s.slowTimer -= dt;
     if (s.surgeTimer > 0) s.surgeTimer -= dt;
     if (s.surgeCd > 0) s.surgeCd -= dt;
@@ -529,6 +545,132 @@ class GameScene extends Phaser.Scene {
     this.updateWaves(dt);
     this.updateSpeedFx(dt, eff);
     this.updateHud(eff);
+  }
+
+  // ---------------------------------------------------------------- opening drop
+
+  // Like Last War's opening: a transport hovers over the road, the squad
+  // parachutes down to its spot, the transport flies off, then the run starts.
+  startIntro() {
+    this.introActive = true;
+    this.introT = 0;
+    this.squadLabel.setVisible(false);
+    this.airship = this.add.image(W / 2, LINE_Y - 400, 'airship').setDepth(40).setScale(1.45);
+    this.airship.lift = 260;
+    this.drops = [];
+    for (let i = 0; i < this.units; i++) {
+      const kn = this.knights[i];
+      kn.setVisible(false);
+      this.drops.push({
+        kn,
+        chute: this.add.image(0, 0, 'chute').setDepth(21).setVisible(false).setScale(kn.isChampion ? 0.9 : 0.7),
+        shadow: this.add.image(0, 0, 'shadow').setDepth(4).setVisible(false),
+        start: 0.7 + i * 0.25,
+        dur: 1.7,
+        landed: false,
+      });
+    }
+    Sfx.tone(70, 1.6, 'sawtooth', 0.05, 0, 90);
+  }
+
+  updateIntro(dt) {
+    this.introT += dt;
+    const t = this.introT;
+    const a = this.airship;
+    if (a) {
+      a.lift = 260 + Math.sin(t * 2.2) * 12;
+      const last = this.drops.length ? this.drops[this.drops.length - 1].start : 0;
+      if (t > last + 0.5) {
+        a.x += 560 * dt;
+        a.y -= 120 * dt;
+        if (a.x > W + 500) {
+          a.destroy();
+          this.airship = null;
+        }
+      }
+    }
+
+    let allLanded = true;
+    for (const d of this.drops) {
+      if (d.landed) continue;
+      allLanded = false;
+      if (t < d.start) continue;
+      if (!d.from) {
+        d.from = { x: (a ? a.x : W / 2) + (Math.random() - 0.5) * 80, y: (a ? a.y : LINE_Y - 400) + 20, lift: 200 };
+      }
+      const k = Math.min(1, (t - d.start) / d.dur);
+      const e = 1 - (1 - k) * (1 - k);
+      const kn = d.kn;
+      const tx = this.squadX + kn.off.x;
+      const ty = LINE_Y + kn.off.y;
+      kn.setVisible(true);
+      kn.x = d.from.x + (tx - d.from.x) * e;
+      kn.y = d.from.y + (ty - d.from.y) * e;
+      kn.lift = d.from.lift * (1 - e) + Math.sin(k * Math.PI * 3) * 6 * (1 - k);
+      d.chute.setVisible(true).setPosition(kn.x, kn.y);
+      d.chute.lift = kn.lift + (kn.isChampion ? 130 : 110);
+      d.chute.setAngle(Math.sin(t * 3 + kn.phase) * 6);
+      d.shadow.setVisible(true).setPosition(kn.x, kn.y + 6).setScale(0.5 + 0.5 * e).setAlpha(0.3 + 0.5 * e);
+      if (k >= 1) {
+        d.landed = true;
+        kn.lift = 0;
+        const chute = d.chute;
+        d.chute = null;
+        this.tweens.add({ targets: chute, alpha: 0, scaleY: 0.2, duration: 300, onComplete: () => chute.destroy() });
+        d.shadow.destroy();
+        d.shadow = null;
+        this.explode(this.burstGold, 8, kn.x, kn.y);
+        Sfx.tone(130, 0.14, 'sine', 0.18, 0, 60);
+      }
+    }
+    if (allLanded && this.drops.length) this.finishIntro();
+  }
+
+  finishIntro() {
+    this.introActive = false;
+    this.knights.forEach((k) => { k.lift = 0; });
+    this.squadLabel.setVisible(true);
+    this.banner('WAVE 1', '#f2c14e', 'Hold the road');
+    this.startTutorial();
+  }
+
+  // "Swipe left or right" hint with a sliding hand, for the first few runs.
+  startTutorial() {
+    const runs = Store.get('tutorialRuns', 0);
+    if (runs >= 3) return;
+    Store.set('tutorialRuns', runs + 1);
+    const y = 1000;
+    const c = this.add.container(0, 0).setDepth(55);
+    const g = this.add.graphics();
+    const arrow = (x1, x2) => {
+      const dir = Math.sign(x2 - x1);
+      g.lineStyle(10, 0x0a0f0e, 0.9);
+      g.lineBetween(x1, y + 64, x2, y + 64);
+      g.lineStyle(5, 0xffffff, 1);
+      g.lineBetween(x1, y + 64, x2, y + 64);
+      g.fillStyle(0x0a0f0e, 0.9);
+      g.fillTriangle(x2 + dir * 22, y + 64, x2 - dir * 6, y + 46, x2 - dir * 6, y + 82);
+      g.fillStyle(0xffffff, 1);
+      g.fillTriangle(x2 + dir * 16, y + 64, x2 - dir * 2, y + 51, x2 - dir * 2, y + 77);
+    };
+    arrow(300, 150);
+    arrow(420, 570);
+    const txt = this.add.text(W / 2, y, 'SWIPE LEFT OR RIGHT TO MOVE YOUR KNIGHTS', textStyle(24, '#ffffff')).setOrigin(0.5);
+    const hand = this.add.image(W / 2, y + 100, 'hand');
+    c.add([g, txt, hand]);
+    this.tweens.add({ targets: hand, x: { from: 270, to: 450 }, duration: 750, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.tutorial = { c, t: 0, moved: 0 };
+  }
+
+  updateTutorial(dt) {
+    const tu = this.tutorial;
+    if (!tu) return;
+    tu.t += dt;
+    if (this.keys.LEFT.isDown || this.keys.RIGHT.isDown || this.keys.A.isDown || this.keys.D.isDown) tu.moved += 600 * dt;
+    if (tu.t > 6 || tu.moved > 160) {
+      this.tutorial = null;
+      this.tweens.add({ targets: tu.c, alpha: 0, duration: 300, onComplete: () => tu.c.destroy() });
+    }
   }
 
   updateSquadVisual(dt, eff) {
