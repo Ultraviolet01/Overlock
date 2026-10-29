@@ -4,9 +4,9 @@
 // unlock is the first wave a type can appear; weight(w) is its spawn weight.
 // The first time a type shows up in a run, its name and tip are announced.
 const ENEMIES = {
-  walker: { key: 'walker', scale: 0.72, hp: 3, speed: 140, r: 28, bite: 1, pts: 10, gain: 0.025, unlock: 1, weight: () => 60 },
+  walker: { key: 'walker', scale: 0.68, hp: 3, speed: 140, r: 28, bite: 1, pts: 10, gain: 0.025, unlock: 1, weight: () => 60 },
   sprinter: {
-    key: 'sprinter', scale: 0.66, hp: 1.6, speed: 330, r: 24, bite: 1, pts: 15, gain: 0.04,
+    key: 'sprinter', scale: 0.56, hp: 1.6, speed: 330, r: 24, bite: 1, pts: 15, gain: 0.04,
     unlock: 2, weight: (w) => 16 + w * 2, name: 'CRAWLER', tip: 'Fast. Shoot it early',
   },
   brute: {
@@ -14,7 +14,7 @@ const ENEMIES = {
     unlock: 3, weight: (w) => 6 + w, name: 'BRUTE', tip: 'Tough, and bites hard',
   },
   wraith: {
-    key: 'wraith', scale: 0.66, hp: 2.4, speed: 190, r: 26, bite: 1, pts: 20, gain: 0.05, zigzag: true,
+    key: 'wraith', scale: 0.62, hp: 2.4, speed: 190, r: 26, bite: 1, pts: 20, gain: 0.05, zigzag: true,
     unlock: 4, weight: (w) => 8 + w, name: 'WRAITH', tip: 'Weaves across the road',
   },
   bloater: {
@@ -22,7 +22,7 @@ const ENEMIES = {
     unlock: 6, weight: (w) => 5 + w * 0.6, name: 'BLOATER', tip: 'Pop it to blast the horde around it',
   },
   shield: {
-    key: 'shield', scale: 0.72, hp: 8, speed: 110, r: 32, bite: 2, pts: 35, gain: 0.08, tag: true, armor: 0.4,
+    key: 'shield', scale: 0.68, hp: 8, speed: 110, r: 32, bite: 2, pts: 35, gain: 0.08, tag: true, armor: 0.4,
     unlock: 7, weight: (w) => 6 + w, name: 'SHIELD SKELETON', tip: 'Its shield blocks most of each bolt',
   },
   summoner: {
@@ -30,10 +30,10 @@ const ENEMIES = {
     unlock: 9, weight: (w) => 3 + w * 0.3, name: 'NECROMANCER', tip: 'Stops and raises cultists. Kill it first',
   },
   splitter: {
-    key: 'splitter', scale: 0.72, hp: 7, speed: 110, r: 36, bite: 2, pts: 30, gain: 0.08, tag: true, splits: true,
+    key: 'splitter', scale: 0.66, hp: 7, speed: 110, r: 36, bite: 2, pts: 30, gain: 0.08, tag: true, splits: true,
     unlock: 11, weight: (w) => 5 + w * 0.6, name: 'FLESH SLIME', tip: 'Splits in two when slain',
   },
-  slimelet: { key: 'splitter', scale: 0.4, hp: 2, speed: 170, r: 20, bite: 1, pts: 8, gain: 0.02, unlock: 99, weight: () => 0 },
+  slimelet: { key: 'splitter', scale: 0.36, hp: 2, speed: 170, r: 20, bite: 1, pts: 8, gain: 0.02, unlock: 99, weight: () => 0 },
 };
 
 // Bosses take turns every 5th wave; each has its own attack. width is the
@@ -162,6 +162,7 @@ class GameScene extends Phaser.Scene {
 
   createWorld() {
     this.ground = this.add.graphics().setDepth(0);
+    this.shadowGfx = this.add.graphics().setDepth(4.5);
     this.roadScroll = 0;
     this.trees = [];
     for (let i = 0; i < 26; i++) {
@@ -198,7 +199,9 @@ class GameScene extends Phaser.Scene {
   projectAll() {
     const list = this.projected || (this.projected = []);
     list.length = 0;
-    const add = (o, depthFromY) => {
+    const sg = this.shadowGfx;
+    sg.clear();
+    const add = (o, depthFromY, walker) => {
       if (!o || !o.visible) return;
       list.push(o);
       o._w = [o.x, o.y, o.scaleX, o.scaleY];
@@ -206,14 +209,28 @@ class GameScene extends Phaser.Scene {
       o.x = p.x;
       o.y = p.y - (o.lift || 0) * p.s;
       o.setScale(o._w[2] * p.s, o._w[3] * p.s);
-      if (depthFromY) o.setDepth(10 + (o._w[1] + 1000) / 10000);
+      if (!depthFromY) return;
+      o.setDepth(10 + (o._w[1] + 1000) / 10000);
+      // Shadow on the road at the feet, offset a little like a low sun.
+      if (!o.lift) {
+        const w = o.displayWidth * 0.7;
+        sg.fillStyle(0x000000, 0.34);
+        sg.fillEllipse(p.x + 8 * p.s, p.y + o.displayHeight * 0.42, w, w * 0.3);
+      }
+      // Walking: a step bob and a side-to-side sway, faster for faster enemies.
+      if (walker) {
+        const f = 6 + (o.def ? o.def.speed : 100) / 35;
+        const ph = this.elapsed * f + (o.wobble || 0);
+        o.y -= Math.abs(Math.sin(ph)) * 7 * p.s;
+        o.setAngle(Math.sin(ph) * 5);
+      }
     };
     this.trees.forEach((o) => add(o));
     this.streaks.forEach((o) => add(o));
     this.embers.forEach((o) => add(o));
     this.gateRows.forEach((row) => row.cards.forEach((c) => add(c)));
     this.barrels.getChildren().forEach((o) => { add(o, true); add(o.hpText); });
-    this.enemies.getChildren().forEach((o) => { add(o, true); add(o.hpText); });
+    this.enemies.getChildren().forEach((o) => { add(o, true, true); add(o.hpText); });
     this.bosses.getChildren().forEach((o) => add(o, true));
     (this.rocks || []).forEach((r) => add(r.img));
     this.knights.forEach((o) => add(o, true));
