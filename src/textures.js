@@ -1,4 +1,5 @@
-// Every sprite is drawn in code at boot, so the build has no image files.
+// Characters are AI-generated images in assets/. Everything else (bolts, road,
+// barrels, effects) is drawn in code at boot.
 
 function makeTextures(scene) {
   const g = scene.make.graphics({ x: 0, y: 0, add: false });
@@ -8,29 +9,6 @@ function makeTextures(scene) {
     draw(g);
     g.generateTexture(key, w, h);
   }
-
-  // Cursed knight: steel armor, blue soul-light visor and chest rune.
-  bake('knight', 40, 52, (g) => {
-    g.fillStyle(COLORS.knight, 0.16);
-    g.fillCircle(20, 30, 20);
-    g.fillStyle(0x16202b, 1);
-    g.fillTriangle(6, 46, 34, 46, 20, 18);
-    g.fillStyle(0x2c3e50, 1);
-    g.fillRoundedRect(11, 22, 18, 22, 5);
-    g.fillStyle(0x42596e, 1);
-    g.fillCircle(11, 25, 5);
-    g.fillCircle(29, 25, 5);
-    g.fillStyle(COLORS.knight, 1);
-    g.fillRect(18, 26, 4, 14);
-    g.fillRect(14, 31, 12, 3);
-    g.fillStyle(0x4a6278, 1);
-    g.fillCircle(20, 15, 9);
-    g.fillRect(11, 14, 18, 7);
-    g.fillStyle(COLORS.knightCore, 1);
-    g.fillRect(13, 15, 14, 3);
-    g.fillStyle(0x16202b, 1);
-    g.fillRect(17, 4, 6, 4);
-  });
 
   // Spectral bolt fired by the knights.
   bake('bolt', 14, 40, (g) => {
@@ -42,86 +20,26 @@ function makeTextures(scene) {
     g.fillEllipse(7, 14, 4, 18);
   });
 
-  // Hooded cultist, the basic horde unit.
-  bake('walker', 56, 64, (g) => {
-    g.fillStyle(COLORS.horde, 0.14);
-    g.fillCircle(28, 34, 28);
-    g.fillStyle(0x4a1312, 1);
-    g.fillTriangle(8, 62, 48, 62, 28, 14);
-    g.fillStyle(COLORS.hordeDark, 1);
-    g.fillTriangle(14, 60, 42, 60, 28, 22);
-    g.fillStyle(COLORS.horde, 1);
-    g.fillTriangle(16, 34, 40, 34, 28, 6);
-    g.fillStyle(0x200807, 1);
-    g.fillEllipse(28, 28, 16, 12);
-    g.fillStyle(COLORS.rot, 1);
-    g.fillCircle(24, 28, 2.5);
-    g.fillCircle(32, 28, 2.5);
-  });
-
-  // Sprinter: a fast, low crawler.
-  bake('sprinter', 52, 46, (g) => {
-    g.fillStyle(COLORS.rot, 0.16);
-    g.fillCircle(26, 24, 22);
-    g.lineStyle(4, 0x3f5f22, 1);
-    g.lineBetween(8, 8, 20, 22);
-    g.lineBetween(44, 8, 32, 22);
-    g.lineBetween(6, 40, 20, 28);
-    g.lineBetween(46, 40, 32, 28);
-    g.fillStyle(0x5f8f2f, 1);
-    g.fillEllipse(26, 25, 24, 30);
-    g.fillStyle(COLORS.rot, 1);
-    g.fillEllipse(26, 20, 14, 14);
-    g.fillStyle(COLORS.horde, 1);
-    g.fillCircle(22, 34, 3);
-    g.fillCircle(30, 34, 3);
-  });
-
-  // Brute: a slow flesh mass with many eyes.
-  bake('brute', 100, 100, (g) => {
-    g.fillStyle(COLORS.horde, 0.14);
-    g.fillCircle(50, 52, 48);
-    g.fillStyle(COLORS.hordeDark, 1);
-    g.fillCircle(50, 54, 38);
-    g.fillCircle(30, 40, 18);
-    g.fillCircle(70, 40, 18);
-    g.fillStyle(0xa02a26, 1);
-    g.fillCircle(50, 50, 28);
-    g.fillStyle(0xf3efc8, 1);
-    [[40, 44, 6], [60, 44, 6], [50, 58, 7], [34, 60, 4], [66, 60, 4]].forEach((e) => g.fillCircle(e[0], e[1], e[2]));
-    g.fillStyle(0x1a0606, 1);
-    [[40, 45, 3], [60, 45, 3], [50, 59, 3.5], [34, 61, 2], [66, 61, 2]].forEach((e) => g.fillCircle(e[0], e[1], e[2]));
-  });
-
-  // Boss: a many-eyed horror with tentacles.
-  bake('boss', 320, 280, (g) => {
-    g.fillStyle(COLORS.horde, 0.12);
-    g.fillCircle(160, 150, 140);
-    g.fillStyle(0x3a0c0b, 1);
-    for (let i = 0; i < 8; i++) {
-      const a = Math.PI * 0.15 + (i / 7) * Math.PI * 0.7;
-      const x = 160 + Math.cos(a) * 110;
-      const y = 150 + Math.sin(a) * 110;
-      g.fillTriangle(160 + Math.cos(a) * 60 - 14, 150 + Math.sin(a) * 60, 160 + Math.cos(a) * 60 + 14, 150 + Math.sin(a) * 60, x, y);
-    }
-    g.fillStyle(COLORS.hordeDark, 1);
-    g.fillCircle(160, 130, 105);
-    g.fillStyle(0x9c2421, 1);
-    g.fillCircle(160, 125, 85);
-    g.fillStyle(0x5a1210, 1);
-    g.fillEllipse(160, 175, 110, 34);
-    g.fillStyle(0xf3efc8, 1);
-    g.fillRect(118, 168, 8, 14);
-    g.fillRect(140, 170, 8, 16);
-    g.fillRect(172, 170, 8, 16);
-    g.fillRect(194, 168, 8, 14);
-    const eyes = [[160, 105, 22], [116, 92, 12], [204, 92, 12], [128, 136, 10], [192, 136, 10], [160, 60, 9], [96, 124, 7], [224, 124, 7]];
-    g.fillStyle(0xf6f2c0, 1);
-    eyes.forEach((e) => g.fillCircle(e[0], e[1], e[2]));
-    g.fillStyle(COLORS.rot, 1);
-    eyes.forEach((e) => g.fillCircle(e[0], e[1] + 1, e[2] * 0.55));
-    g.fillStyle(0x0c0303, 1);
-    eyes.forEach((e) => g.fillCircle(e[0], e[1] + 1, e[2] * 0.25));
+  // Rune barrel: break it for an upgrade before it rolls into the squad.
+  bake('barrel', 80, 88, (g) => {
+    g.fillStyle(COLORS.knight, 0.18);
+    g.fillCircle(40, 44, 40);
+    g.fillStyle(0x0b0b0b, 1);
+    g.fillRoundedRect(10, 6, 60, 76, 16);
+    g.fillStyle(0x6b4426, 1);
+    g.fillRoundedRect(14, 10, 52, 68, 13);
+    g.fillStyle(0x845733, 1);
+    g.fillRect(24, 10, 8, 68);
+    g.fillRect(48, 10, 6, 68);
+    g.fillStyle(0x2b2f33, 1);
+    g.fillRect(14, 20, 52, 7);
+    g.fillRect(14, 61, 52, 7);
+    g.fillStyle(COLORS.knight, 1);
+    g.fillTriangle(40, 30, 50, 44, 40, 58);
+    g.fillTriangle(40, 30, 30, 44, 40, 58);
+    g.fillStyle(0xffffff, 1);
+    g.fillTriangle(40, 37, 44, 44, 40, 51);
+    g.fillTriangle(40, 37, 36, 44, 40, 51);
   });
 
   // Forest road, tiled vertically and scrolled to show speed.

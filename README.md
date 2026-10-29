@@ -12,7 +12,11 @@ A portrait, one-thumb horde shooter built for Slapjam AI 2. The jam theme is **S
   - Red cards hurt: `-6`, `÷2`, or fire rate `-40%`.
   - Teal cards boost speed: fire rate `x2`, bolt speed `+50%`, or horde slow for 5 seconds.
 - Shoot the `+` and `-` cards to raise their number. A higher fire rate pumps them up faster, and a red `-6` can be turned into a gold `+4`.
+- Don't shoot the red `÷` and fire rate trap cards. Shooting makes them worse (`÷2` becomes `÷3`, `-40%` becomes `-50%`).
+- Every 10 knights merge into one champion, so a squad of hundreds stays readable.
+- Rune barrels roll down a lane. Shoot one open for piercing bolts, extra bolt damage or more knights. If you don't break it and it reaches your squad, it crashes into it.
 - The horde speeds up every 15 seconds. Every 5th wave a giant horror charges at you. Kill it before it reaches your knights.
+- The horror marks a red lane where your squad stands, then slams it. Slide out of the lane in time to dodge and gain fire rate.
 - The game is endless. Chase your best wave, top fire rate and score.
 
 ## Captains
@@ -30,7 +34,8 @@ A portrait, one-thumb horde shooter built for Slapjam AI 2. The jam theme is **S
 
 - Phaser 3.80.1, stored in `lib/` so the game needs no internet.
 - Plain JavaScript, no build step.
-- All art is drawn in code at startup, and all sound is made with WebAudio, so there are no asset files.
+- Character art (knight, champion, cultist, crawler, brute, horror) was generated with AI (Higgsfield, Z Image model), then cut out and resized. The files are in `assets/`.
+- Bolts, road, barrels and effects are drawn in code at startup, and all sound is made with WebAudio.
 - Game size is 720 x 1280 and scales to fit any screen.
 
 ## Run it locally
@@ -65,6 +70,13 @@ python3 -m http.server 8000
 - `index.html`: page shell, loads the scripts.
 - `src/config.js`: tuning values, captains, colors, helpers.
 - `src/audio.js`: sound effects and the speed-linked music.
-- `src/textures.js`: draws every sprite.
+- `assets/`: AI-generated character sprites.
+- `src/textures.js`: draws the bolts, road, barrels and effects.
 - `src/scenes/`: boot, title, game and game over screens.
 - `scripts/package.sh`: builds the itch.io zip.
+
+## AI use (for the jam disclosure)
+
+- Code: written with Claude Code.
+- Character art: generated with Higgsfield (Z Image).
+- Sound and music: synthesized in code written with Claude Code.

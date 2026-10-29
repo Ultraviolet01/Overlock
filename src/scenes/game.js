@@ -1,16 +1,26 @@
-// The run itself: squad, horde, gates, boss, waves, and the speed HUD.
+// The run itself: squad, horde, gates, barrels, boss, waves, and the speed HUD.
 
+// scale is the sprite's display scale; r is the hit radius in screen pixels.
 const ENEMIES = {
-  walker: { key: 'walker', hp: 3, speed: 110, r: 20, bite: 1, pts: 10, gain: 0.025 },
-  sprinter: { key: 'sprinter', hp: 1.6, speed: 270, r: 17, bite: 1, pts: 15, gain: 0.04 },
-  brute: { key: 'brute', hp: 16, speed: 70, r: 36, bite: 4, pts: 50, gain: 0.12 },
+  walker: { key: 'walker', scale: 0.6, hp: 3, speed: 110, r: 28, bite: 1, pts: 10, gain: 0.025 },
+  sprinter: { key: 'sprinter', scale: 0.55, hp: 1.6, speed: 270, r: 24, bite: 1, pts: 15, gain: 0.04 },
+  brute: { key: 'brute', scale: 0.72, hp: 16, speed: 70, r: 54, bite: 4, pts: 50, gain: 0.12 },
 };
 
-const MAX_SHOWN_KNIGHTS = 40;
+const UNIT = {
+  knight: { key: 'knight', scale: 0.44 },
+  champion: { key: 'champion', scale: 0.5 },
+};
+
+const MERGE_SIZE = 10;         // this many knights merge into one champion
+const MAX_UNITS = 40;          // sprites drawn for the squad
+const MAX_CHAMPIONS = 30;
 const SQUAD_MIN_X = 110;
-const SQUAD_MAX_X = W - 110;
 const CARD_W = 268;
 const CARD_H = 140;
+const BOSS_SCALE = 0.8;
+const SLAM_HALF_W = 95;
+const MAX_SQUAD_RADIUS = 120; // keeps a big crowd narrow enough to dodge
 
 function lerpColor(a, b, t) {
   const ar = (a >> 16) & 255, ag = (a >> 8) & 255, ab = a & 255;
@@ -18,9 +28,9 @@ function lerpColor(a, b, t) {
   return (Math.round(ar + (br - ar) * t) << 16) | (Math.round(ag + (bg - ag) * t) << 8) | Math.round(ab + (bb - ab) * t);
 }
 
-function formation(i) {
+function formation(i, spacing) {
   if (i === 0) return { x: 0, y: 0 };
-  const r = 17 * Math.sqrt(i);
+  const r = spacing * Math.sqrt(i);
   const a = i * 2.39996;
   return { x: Math.cos(a) * r, y: Math.sin(a) * r * 0.55 };
 }
@@ -46,6 +56,8 @@ class GameScene extends Phaser.Scene {
       kills: 0,
       bosses: 0,
       boltMult: 1,
+      dmgMult: 1,
+      pierce: 0,
       slowTimer: 0,
       surgeTimer: 0,
       surgeCd: 0,
@@ -57,9 +69,14 @@ class GameScene extends Phaser.Scene {
     this.fireTimer = 0.2;
     this.spawnTimer = 1.2;
     this.gateTimer = 2.5;
+    this.barrelTimer = 14;
     this.elapsed = 0;
     this.gateRows = [];
     this.drag = null;
+    this.units = 0;
+    this.spacing = 26;
+    this.champions = 0;
+    this.slam = null;
 
     this.createWorld();
     this.createSquad();
@@ -71,7 +88,7 @@ class GameScene extends Phaser.Scene {
     Music.start();
     this.events.once('shutdown', () => Music.stop());
 
-    this.banner('DRAG TO STEER', '#c8f1ff', 'Shoot the cards to raise them');
+    this.banner('DRAG TO STEER', '#c8f1ff', 'Shoot gold cards to raise them');
   }
 
   // ---------------------------------------------------------------- setup
@@ -106,9 +123,9 @@ class GameScene extends Phaser.Scene {
 
   createSquad() {
     this.knights = [];
-    for (let i = 0; i < MAX_SHOWN_KNIGHTS; i++) {
-      const k = this.add.image(this.squadX, LINE_Y, 'knight').setDepth(20 + i * 0.01);
-      k.off = formation(i);
+    for (let i = 0; i < MAX_UNITS; i++) {
+      const k = this.add.image(this.squadX, LINE_Y, 'knight').setVisible(false);
+      k.off = { x: 0, y: 0 };
       k.phase = Math.random() * Math.PI * 2;
       this.knights.push(k);
     }
@@ -122,8 +139,12 @@ class GameScene extends Phaser.Scene {
     this.bullets = this.physics.add.group({ defaultKey: 'bolt', maxSize: 500 });
     this.enemies = this.physics.add.group({ maxSize: 260 });
     this.bosses = this.physics.add.group({ maxSize: 2 });
+    this.barrels = this.physics.add.group({ maxSize: 6 });
+    // A group made from a config object starts with one placeholder sprite; drop it.
+    [this.bullets, this.enemies, this.bosses, this.barrels].forEach((grp) => grp.clear(true, true));
     this.physics.add.overlap(this.bullets, this.enemies, this.onBulletHit, null, this);
     this.physics.add.overlap(this.bullets, this.bosses, this.onBulletHit, null, this);
+    this.physics.add.overlap(this.bullets, this.barrels, this.onBulletHit, null, this);
 
     const burst = (tint) => this.add.particles(0, 0, 'dot', {
       speed: { min: 80, max: 300 },
@@ -137,6 +158,8 @@ class GameScene extends Phaser.Scene {
     this.burstRot = burst(COLORS.rot);
     this.burstBlue = burst(COLORS.knight);
     this.burstGold = burst(COLORS.gold);
+
+    this.slamGfx = this.add.graphics().setDepth(8);
 
     this.numbers = [];
     for (let i = 0; i < 40; i++) {
@@ -219,6 +242,7 @@ class GameScene extends Phaser.Scene {
     this.s.squad = clamp(Math.round(n), 0, TUNING.squadCap);
     this.s.maxSquad = Math.max(this.s.maxSquad, this.s.squad);
     this.squadLabel.setText(String(this.s.squad));
+    this.layoutSquad(silent);
     if (!silent && prev !== this.s.squad) {
       this.tweens.killTweensOf(this.squadLabel);
       this.squadLabel.setScale(1.35);
@@ -227,9 +251,39 @@ class GameScene extends Phaser.Scene {
     if (this.s.squad <= 0) this.gameOver();
   }
 
+  // Every MERGE_SIZE knights merge into one champion, so big squads stay readable.
+  layoutSquad(silent) {
+    const n = this.s.squad;
+    const champs = Math.min(MAX_CHAMPIONS, Math.floor(n / MERGE_SIZE));
+    const singles = Math.min(MERGE_SIZE - 1, n - champs * MERGE_SIZE);
+    if (!silent && champs > this.champions) {
+      this.burstBlue.explode(24, this.squadX, LINE_Y - 20);
+      this.popNumber(this.squadX, LINE_Y - 200, 'CHAMPION RISES', '#4fc3ff', 30);
+    }
+    this.champions = champs;
+    this.units = champs + singles;
+    const base = champs > 0 ? 34 : 26;
+    this.spacing = this.units > 1 ? Math.min(base, MAX_SQUAD_RADIUS / Math.sqrt(this.units - 1)) : base;
+    for (let i = 0; i < this.knights.length; i++) {
+      const k = this.knights[i];
+      if (i >= this.units) {
+        k.setVisible(false);
+        continue;
+      }
+      const u = i < champs ? UNIT.champion : UNIT.knight;
+      if (k.texture.key !== u.key) k.setTexture(u.key);
+      k.setScale(u.scale);
+      k.isChampion = i < champs;
+      k.off = formation(i, this.spacing);
+      k.setDepth(20 + (k.off.y + 60) * 0.01);
+      if (!k.visible) {
+        k.setPosition(this.squadX + k.off.x, LINE_Y + k.off.y).setVisible(true);
+      }
+    }
+  }
+
   squadSpread() {
-    const shown = Math.min(this.s.squad, MAX_SHOWN_KNIGHTS);
-    return shown > 1 ? 17 * Math.sqrt(shown - 1) : 0;
+    return this.units > 1 ? this.spacing * Math.sqrt(this.units - 1) : 0;
   }
 
   // A bigger crowd is wider, so keep the whole crowd on the road.
@@ -269,7 +323,10 @@ class GameScene extends Phaser.Scene {
     this.updateFiring(dt, eff);
     this.updateBullets();
     this.updateEnemies();
-    this.updateBoss();
+    if (s.over) return;
+    this.updateBarrels(dt);
+    if (s.over) return;
+    this.updateBoss(dt);
     if (s.over) return;
     this.updateGates(dt);
     if (s.over) return;
@@ -280,20 +337,17 @@ class GameScene extends Phaser.Scene {
   }
 
   updateSquadVisual(dt, eff) {
-    const shown = Math.min(this.s.squad, MAX_SHOWN_KNIGHTS);
     const k = Math.min(1, dt * 12);
     const bobRate = 8 + eff * 1.6;
-    for (let i = 0; i < this.knights.length; i++) {
+    for (let i = 0; i < this.units; i++) {
       const kn = this.knights[i];
-      kn.setVisible(i < shown);
-      if (i >= shown) continue;
       const tx = this.squadX + kn.off.x;
       const ty = LINE_Y + kn.off.y + Math.sin(this.elapsed * bobRate + kn.phase) * 3;
       kn.x += (tx - kn.x) * k;
       kn.y += (ty - kn.y) * k;
     }
     const spread = this.squadSpread();
-    this.squadLabel.setPosition(this.squadX, LINE_Y - 70 - spread * 0.55);
+    this.squadLabel.setPosition(this.squadX, LINE_Y - 100 - spread * 0.55);
   }
 
   // ---------------------------------------------------------------- shooting
@@ -309,23 +363,26 @@ class GameScene extends Phaser.Scene {
   }
 
   fireVolley(eff) {
-    const shown = Math.min(this.s.squad, MAX_SHOWN_KNIGHTS);
+    const shown = this.units;
     if (shown <= 0) return;
-    const shooters = Math.min(this.s.squad, TUNING.maxShooters, shown);
-    const dmg = this.hero.damage * this.s.squad / shooters;
+    const shooters = Math.min(this.s.squad, TUNING.maxShooters);
+    const dmg = this.hero.damage * this.s.dmgMult * this.s.squad / shooters;
     const vy = TUNING.boltSpeed * this.s.boltMult * (this.s.surgeTimer > 0 ? 1.5 : 1);
     for (let j = 0; j < shooters; j++) {
       const kn = this.knights[Math.floor(Math.random() * shown)];
-      const b = this.bullets.get(kn.x, kn.y - 24, 'bolt');
+      const y = kn.y - (kn.isChampion ? 56 : 36);
+      const b = this.bullets.get(kn.x, y, 'bolt');
       if (!b) break;
-      b.enableBody(true, kn.x, kn.y - 24, true, true);
+      b.enableBody(true, kn.x, y, true, true);
       b.setDepth(15).setBlendMode(Phaser.BlendModes.ADD);
       b.body.setSize(10, 30);
       b.setVelocity((Math.random() - 0.5) * 50, -vy);
       b.dmg = dmg;
+      b.pierce = this.s.pierce;
+      b.lastHit = null;
     }
     const kn = this.knights[Math.floor(Math.random() * shown)];
-    const f = this.add.image(kn.x, kn.y - 28, 'flash').setDepth(31).setBlendMode(Phaser.BlendModes.ADD)
+    const f = this.add.image(kn.x, kn.y - 30, 'flash').setDepth(31).setBlendMode(Phaser.BlendModes.ADD)
       .setScale(0.5 + eff * 0.08);
     this.tweens.add({ targets: f, alpha: 0, scale: f.scale * 1.6, duration: 90, onComplete: () => f.destroy() });
     Sfx.shoot(eff);
@@ -364,9 +421,14 @@ class GameScene extends Phaser.Scene {
       bullet = b;
       target = a;
     }
-    if (!bullet.active || !target.active) return;
-    this.killBullet(bullet);
+    if (!bullet.active || !target.active || bullet.lastHit === target) return;
     this.damage(target, bullet.dmg);
+    if (bullet.pierce > 0 && !target.isBoss && !target.isBarrel) {
+      bullet.pierce--;
+      bullet.lastHit = target;
+    } else {
+      this.killBullet(bullet);
+    }
   }
 
   damage(e, dmg) {
@@ -381,7 +443,9 @@ class GameScene extends Phaser.Scene {
       e.lastNum = this.elapsed;
       if (Math.random() < 0.5) Sfx.hit();
     }
-    if (e.hp <= 0) this.killEnemy(e, true);
+    if (e.hp > 0) return;
+    if (e.isBarrel) this.breakBarrel(e);
+    else this.killEnemy(e, true);
   }
 
   // ---------------------------------------------------------------- horde
@@ -392,10 +456,13 @@ class GameScene extends Phaser.Scene {
     if (!e) return;
     e.setTexture(def.key);
     e.enableBody(true, x, -70, true, true);
-    e.setCircle(def.r, e.width / 2 - def.r, e.height / 2 - def.r);
-    e.setDepth(10).clearTint().setScale(1).setAlpha(1);
+    e.setScale(def.scale);
+    const rt = def.r / def.scale;
+    e.setCircle(rt, e.width / 2 - rt, e.height / 2 - rt);
+    e.setDepth(10).clearTint().setAlpha(1);
     e.def = def;
     e.isBoss = false;
+    e.isBarrel = false;
     e.hp = def.hp * this.waveScale();
     e.dmgAcc = 0;
     e.lastNum = 0;
@@ -438,6 +505,7 @@ class GameScene extends Phaser.Scene {
         vx = Math.sin(this.elapsed * 2 + e.wobble) * 30;
       }
       e.setVelocity(vx, vy);
+      e.setFlipX(vx < -20);
       this.applyHitFlash(e);
       if (e.y >= LINE_Y - 30) this.bite(e);
       if (this.s.over) return;
@@ -481,41 +549,130 @@ class GameScene extends Phaser.Scene {
     Sfx.kill();
   }
 
+  // ---------------------------------------------------------------- rune barrels
+
+  // A barrel rolls down a lane. Break it for an upgrade, or it crashes into the squad.
+  spawnBarrel() {
+    const x = 150 + Math.random() * (W - 300);
+    const b = this.barrels.get(x, -60, 'barrel');
+    if (!b) return;
+    b.enableBody(true, x, -60, true, true);
+    b.setCircle(34, b.width / 2 - 34, b.height / 2 - 34);
+    b.setDepth(9).clearTint().setScale(1).setAngle(0);
+    b.isBarrel = true;
+    b.isBoss = false;
+    b.hp = b.maxHp = 28 * this.waveScale();
+    b.dmgAcc = 0;
+    b.lastNum = 0;
+    b.hitFlash = 0;
+  }
+
+  updateBarrels(dt) {
+    this.barrelTimer -= dt;
+    if (this.barrelTimer <= 0) {
+      this.spawnBarrel();
+      this.barrelTimer = 16 + Math.random() * 6;
+    }
+    const fall = TUNING.gateFall * 1.15 * (1 + (this.s.wave - 1) * 0.04);
+    const list = this.barrels.getChildren();
+    for (let i = 0; i < list.length; i++) {
+      const b = list[i];
+      if (!b.active) continue;
+      b.setVelocity(0, fall);
+      b.setAngle(Math.sin(this.elapsed * 4 + b.x) * 8);
+      this.applyHitFlash(b);
+      if (b.y >= LINE_Y - 40) {
+        if (Math.abs(b.x - this.squadX) < this.squadSpread() + 60) {
+          this.barrelCrash(b);
+          if (this.s.over) return;
+        } else if (b.y > H + 80) {
+          b.disableBody(true, true);
+        }
+      }
+    }
+  }
+
+  barrelCrash(b) {
+    b.disableBody(true, true);
+    const lost = Math.ceil(this.s.squad * 0.15) + 2;
+    this.burstGold.explode(30, b.x, LINE_Y - 20);
+    this.popNumber(this.squadX, LINE_Y - 150, 'BARREL CRASH -' + lost, '#e0413a', 36);
+    this.cameras.main.shake(200, 0.01);
+    Sfx.bite();
+    this.setSquad(this.s.squad - lost);
+  }
+
+  breakBarrel(b) {
+    b.disableBody(true, true);
+    const s = this.s;
+    const reward = weighted([
+      ['pierce', s.pierce < 2 ? 35 : 0],
+      ['power', 35],
+      ['squad', 30],
+    ]);
+    let msg;
+    if (reward === 'pierce') {
+      s.pierce++;
+      msg = 'PIERCING BOLTS ' + s.pierce;
+    } else if (reward === 'power') {
+      s.dmgMult *= 1.3;
+      msg = 'BOLT DAMAGE +30%';
+    } else {
+      const n = 5 + s.wave * 2;
+      msg = '+' + n + ' KNIGHTS';
+      this.setSquad(s.squad + n);
+    }
+    this.burstGold.explode(40, b.x, b.y);
+    this.burstBlue.explode(30, b.x, b.y);
+    this.popNumber(b.x, b.y - 40, msg, '#4fe0c8', 34);
+    this.addSpeed(0.3);
+    Sfx.gateGood();
+  }
+
   // ---------------------------------------------------------------- boss
 
   spawnBoss() {
-    const b = this.bosses.get(W / 2, -170, 'boss');
+    const b = this.bosses.get(W / 2, -220, 'boss');
     if (!b) return;
-    b.enableBody(true, W / 2, -170, true, true);
-    b.setCircle(115, b.width / 2 - 115, b.height / 2 - 125);
+    b.enableBody(true, W / 2, -220, true, true);
+    b.setScale(BOSS_SCALE);
+    const rt = 125 / BOSS_SCALE;
+    b.setCircle(rt, b.width / 2 - rt, b.height / 2 - rt - 20);
     b.setDepth(11).clearTint();
     b.isBoss = true;
+    b.isBarrel = false;
     b.maxHp = 900 * Math.pow(this.s.wave / TUNING.bossEvery, 1.6);
     b.hp = b.maxHp;
     b.dmgAcc = 0;
     b.lastNum = 0;
     b.hitFlash = 0;
-    b.startY = -170;
-    b.endY = LINE_Y - 190;
+    b.startY = -220;
+    b.endY = LINE_Y - 260;
+    b.slamTimer = 2.5;
     this.boss = b;
+    this.slam = null;
     this.s.bossActive = true;
-    this.banner('A HORROR APPROACHES', '#e0413a', 'Kill it before it reaches your knights');
+    this.banner('A HORROR APPROACHES', '#e0413a', 'Dodge the red slams');
     Sfx.bossRoar();
     this.cameras.main.shake(600, 0.008);
   }
 
-  updateBoss() {
+  updateBoss(dt) {
     const b = this.boss;
     if (!b || !b.active) {
       this.bossBar.clear();
+      this.slamGfx.clear();
       this.bossLabel.setText('');
       return;
     }
     const v = (b.endY - b.startY) / TUNING.bossTime * (this.s.slowTimer > 0 ? 0.45 : 1);
     b.setVelocity(Math.sin(this.elapsed * 1.5) * 40, v);
-    b.x = clamp(b.x, 170, W - 170);
+    b.x = clamp(b.x, 190, W - 190);
     this.applyHitFlash(b);
-    b.setScale(1 + Math.sin(this.elapsed * 6) * 0.02);
+    b.setScale(BOSS_SCALE * (1 + Math.sin(this.elapsed * 6) * 0.02));
+
+    this.updateSlam(b, dt);
+    if (this.s.over || !b.active) return;
 
     const hpRatio = clamp(b.hp / b.maxHp, 0, 1);
     const reach = clamp((b.y - b.startY) / (b.endY - b.startY), 0, 1);
@@ -531,10 +688,58 @@ class GameScene extends Phaser.Scene {
     if (b.y >= b.endY) this.bossSmash(b);
   }
 
-  bossSmash(b) {
+  // The boss marks a lane where the squad stands, then slams it.
+  // Sliding out in time is a dodge and gives a little fire rate.
+  updateSlam(b, dt) {
+    const g = this.slamGfx;
+    g.clear();
+    if (!this.slam) {
+      b.slamTimer -= dt;
+      if (b.slamTimer > 0) return;
+      const warn = Math.max(0.75, 1.15 - this.s.wave * 0.02);
+      this.slam = { x: this.squadX, t: warn, warn };
+      b.slamTimer = Math.max(2, 3.4 - this.s.wave * 0.05);
+      Sfx.tone(180, 0.3, 'sawtooth', 0.08, 0, 120);
+    }
+    const sl = this.slam;
+    sl.t -= dt;
+    const top = Math.max(0, b.y);
+    const pulse = 0.18 + 0.14 * Math.sin(this.elapsed * 30);
+    g.fillStyle(COLORS.horde, pulse + (1 - sl.t / sl.warn) * 0.2);
+    g.fillRect(sl.x - SLAM_HALF_W, top, SLAM_HALF_W * 2, H - top);
+    g.lineStyle(4, COLORS.horde, 0.9);
+    g.strokeRect(sl.x - SLAM_HALF_W, top, SLAM_HALF_W * 2, H - top);
+    if (sl.t > 0) return;
+
+    this.slam = null;
+    const flash = this.add.rectangle(sl.x, (top + H) / 2, SLAM_HALF_W * 2, H - top, 0xffd0c0, 0.7).setDepth(32);
+    this.tweens.add({ targets: flash, alpha: 0, duration: 260, onComplete: () => flash.destroy() });
+    for (let y = top + 80; y < H; y += 160) this.burstRed.explode(8, sl.x, y);
+    this.cameras.main.shake(220, 0.012);
+    Sfx.noise(0.4, 0.2, 0, 300, 'lowpass');
+
+    if (Math.abs(this.squadX - sl.x) < SLAM_HALF_W + this.squadSpread() * 0.4) {
+      const lost = Math.ceil(this.s.squad * 0.2) + 2;
+      this.addSpeed(-0.8 * this.hero.hitLoss);
+      this.popNumber(this.squadX, LINE_Y - 150, 'SLAMMED -' + lost, '#e0413a', 40);
+      Sfx.bite();
+      this.setSquad(this.s.squad - lost);
+    } else {
+      this.addSpeed(0.4);
+      this.popNumber(this.squadX, LINE_Y - 150, 'DODGED  +SPEED', '#4fe0c8', 36);
+    }
+  }
+
+  endBoss(b) {
     b.disableBody(true, true);
     this.boss = null;
+    this.slam = null;
+    this.slamGfx.clear();
     this.s.bossActive = false;
+  }
+
+  bossSmash(b) {
+    this.endBoss(b);
     const lost = Math.ceil(this.s.squad * 0.5) + 3;
     this.addSpeed(-2 * this.hero.hitLoss);
     this.burstRed.explode(60, this.squadX, LINE_Y - 40);
@@ -548,9 +753,7 @@ class GameScene extends Phaser.Scene {
   }
 
   bossDown(b) {
-    b.disableBody(true, true);
-    this.boss = null;
-    this.s.bossActive = false;
+    this.endBoss(b);
     this.s.bosses++;
     this.s.kills++;
     this.s.score += Math.round(1000 * (this.s.wave / TUNING.bossEvery) * Math.ceil(this.effSpeed()));
@@ -577,8 +780,8 @@ class GameScene extends Phaser.Scene {
     const w = this.s.wave;
     const kind = weighted([['add', 45], ['div', 25], ['trap', 30]]);
     if (kind === 'add') return { kind, value: -Math.round(2 + w + Math.random() * (2 + w)) };
-    if (kind === 'div') return { kind, value: 2 };
-    return { kind };
+    if (kind === 'div') return { kind, value: 2, prog: 0 };
+    return { kind, pct: 40, prog: 0 };
   }
 
   spawnGateRow() {
@@ -588,11 +791,12 @@ class GameScene extends Phaser.Scene {
       const x = i === 0 ? W / 2 - CARD_W / 2 - 8 : W / 2 + CARD_W / 2 + 8;
       const c = this.add.container(x, row.y).setDepth(5);
       c.gate = p;
-      c.shootable = p.kind === 'add';
+      // Shooting raises +/- cards, and makes the red divide and trap cards worse.
+      c.shootable = p.kind === 'add' || p.kind === 'div' || p.kind === 'trap';
       c.startValue = p.value || 0;
       c.bg = this.add.graphics();
-      c.label = this.add.text(0, -12, '', textStyle(56, '#ffffff', { stroke: '#0b1412', strokeThickness: 8 })).setOrigin(0.5);
-      c.sub = this.add.text(0, 44, '', textStyle(20, COLORS.text)).setOrigin(0.5);
+      c.label = this.add.text(0, -14, '', textStyle(56, '#ffffff', { stroke: '#0b1412', strokeThickness: 8 })).setOrigin(0.5);
+      c.sub = this.add.text(0, 42, '', textStyle(18, COLORS.text)).setOrigin(0.5);
       c.add([c.bg, c.label, c.sub]);
       this.drawCard(c);
       row.cards.push(c);
@@ -604,12 +808,12 @@ class GameScene extends Phaser.Scene {
     switch (g.kind) {
       case 'add': {
         const v = Math.round(g.value);
-        return { text: (v >= 0 ? '+' : '') + v, sub: 'KNIGHTS', color: v > 0 ? COLORS.gold : COLORS.bad };
+        return { text: (v >= 0 ? '+' : '') + v, sub: 'KNIGHTS  |  SHOOT: UP', color: v > 0 ? COLORS.gold : COLORS.bad };
       }
       case 'mul': return { text: 'x' + g.value, sub: 'KNIGHTS', color: COLORS.gold };
-      case 'div': return { text: '÷' + g.value, sub: 'KNIGHTS', color: COLORS.bad };
+      case 'div': return { text: '÷' + g.value, sub: 'KNIGHTS  |  SHOOT: WORSE', color: COLORS.bad };
       case 'fire': return { text: 'x2', sub: 'FIRE RATE', color: COLORS.speedGate };
-      case 'trap': return { text: '-40%', sub: 'FIRE RATE', color: COLORS.bad };
+      case 'trap': return { text: '-' + g.pct + '%', sub: 'FIRE RATE  |  SHOOT: WORSE', color: COLORS.bad };
       case 'bolt': return { text: '+50%', sub: 'BOLT SPEED', color: COLORS.speedGate };
       case 'slow': return { text: 'SLOW', sub: 'HORDE 5s', color: COLORS.speedGate };
     }
@@ -637,21 +841,30 @@ class GameScene extends Phaser.Scene {
     });
     c.label.setText(info.text);
     c.label.setColor('#' + info.color.toString(16).padStart(6, '0'));
-    c.sub.setText(c.shootable ? info.sub + '  (shoot me)' : info.sub);
+    c.sub.setText(info.sub);
     c.shownText = info.text;
   }
 
   hitCard(c) {
-    const cap = c.startValue + 30 + this.s.wave * 3;
-    c.gate.value = Math.min(cap, c.gate.value + 0.34);
-    const info = this.cardInfo(c.gate);
+    const g = c.gate;
+    if (g.kind === 'add') {
+      const cap = c.startValue + 30 + this.s.wave * 3;
+      g.value = Math.min(cap, g.value + 0.34);
+    } else if (g.kind === 'div') {
+      g.prog++;
+      g.value = Math.min(5, 2 + Math.floor(g.prog / 30));
+    } else if (g.kind === 'trap') {
+      g.prog++;
+      g.pct = Math.min(80, 40 + Math.floor(g.prog / 12) * 5);
+    }
+    const info = this.cardInfo(g);
     if (info.text !== c.shownText) {
       this.drawCard(c);
       c.label.setScale(1.25);
       this.tweens.add({ targets: c.label, scale: 1, duration: 120 });
       Sfx.gateTick();
     }
-    this.burstBlue.explode(2, c.x + (Math.random() - 0.5) * 120, c.y + CARD_H / 2 - 10);
+    (g.kind === 'add' ? this.burstBlue : this.burstRed).explode(2, c.x + (Math.random() - 0.5) * 120, c.y + CARD_H / 2 - 10);
   }
 
   updateGates(dt) {
@@ -705,8 +918,8 @@ class GameScene extends Phaser.Scene {
         break;
       case 'trap':
         good = false;
-        msg = 'FIRE RATE -40%';
-        s.speed = Math.max(1, s.speed * 0.6);
+        msg = 'FIRE RATE -' + g.pct + '%';
+        s.speed = Math.max(1, s.speed * (1 - g.pct / 100));
         break;
       case 'bolt':
         msg = 'BOLT SPEED +50%';
@@ -717,6 +930,7 @@ class GameScene extends Phaser.Scene {
         s.slowTimer = 5;
         break;
     }
+    if (s.over) return;
     this.popNumber(this.squadX, LINE_Y - 160, msg, good ? '#f2c14e' : '#e0413a', 44);
     if (good) {
       this.burstGold.explode(30, this.squadX, LINE_Y - 20);
@@ -851,7 +1065,9 @@ class GameScene extends Phaser.Scene {
     const status = [];
     if (this.s.slowTimer > 0) status.push('HORDE SLOW ' + Math.ceil(this.s.slowTimer) + 's');
     if (this.s.surgeTimer > 0) status.push('SURGE ' + Math.ceil(this.s.surgeTimer) + 's');
-    if (this.s.boltMult > 1) status.push('BOLTS x' + this.s.boltMult.toFixed(1));
+    if (this.s.boltMult > 1) status.push('BOLT SPEED x' + this.s.boltMult.toFixed(1));
+    if (this.s.dmgMult > 1) status.push('BOLT DAMAGE x' + this.s.dmgMult.toFixed(1));
+    if (this.s.pierce > 0) status.push('PIERCE ' + this.s.pierce);
     this.statusText.setText(status.join('\n'));
 
     if (this.surgeBtn) {
@@ -880,6 +1096,7 @@ class GameScene extends Phaser.Scene {
     Music.stop();
     Sfx.lose();
     this.physics.pause();
+    this.slamGfx.clear();
     this.cameras.main.shake(400, 0.012);
     this.squadLabel.setText('0');
     this.banner('FALLEN', '#e0413a');
