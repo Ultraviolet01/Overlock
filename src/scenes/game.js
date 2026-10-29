@@ -8,7 +8,7 @@ const ENEMIES = {
 };
 
 const UNIT = {
-  knight: { key: 'knight', scale: 0.62 },
+  knight: { key: 'knight', scale: 0.44 },
   champion: { key: 'champion', scale: 0.5 },
 };
 
@@ -370,7 +370,7 @@ class GameScene extends Phaser.Scene {
     const vy = TUNING.boltSpeed * this.s.boltMult * (this.s.surgeTimer > 0 ? 1.5 : 1);
     for (let j = 0; j < shooters; j++) {
       const kn = this.knights[Math.floor(Math.random() * shown)];
-      const y = kn.y - (kn.isChampion ? 56 : 52);
+      const y = kn.y - (kn.isChampion ? 56 : 36);
       const b = this.bullets.get(kn.x, y, 'bolt');
       if (!b) break;
       b.enableBody(true, kn.x, y, true, true);
