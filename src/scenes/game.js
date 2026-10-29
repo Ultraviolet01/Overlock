@@ -64,6 +64,8 @@ class GameScene extends Phaser.Scene {
       bossActive: false,
       over: false,
     };
+    this.paused = false;
+    this.time.paused = false;
     this.squadX = W / 2;
     this.targetX = W / 2;
     this.fireTimer = 0.2;
@@ -175,19 +177,21 @@ class GameScene extends Phaser.Scene {
       .setOrigin(0.5).setDepth(51);
     this.add.text(W / 2, 232, 'FIRE RATE', textStyle(20, COLORS.textDim)).setOrigin(0.5).setDepth(51);
 
-    this.waveText = this.add.text(28, 26, 'WAVE 1', textStyle(34, '#f2c14e', { stroke: '#0b1412', strokeThickness: 6 })).setDepth(51);
-    this.waveBar = this.add.graphics().setDepth(51);
-    this.statusText = this.add.text(28, 108, '', textStyle(22, '#4fe0c8', { stroke: '#0b1412', strokeThickness: 5 })).setDepth(51);
+    this.pauseBtn = uiIconButton(this, 56, 58, 'pause', () => this.pauseGame()).setDepth(52);
 
-    this.scoreText = this.add.text(W - 28, 26, '0', textStyle(34, COLORS.text, { stroke: '#0b1412', strokeThickness: 6 }))
+    this.waveText = this.add.text(112, 22, 'WAVE 1', textStyle(34, '#f2c14e', { stroke: '#0b1412', strokeThickness: 6 })).setDepth(51);
+    this.waveBar = this.add.graphics().setDepth(51);
+    this.bossNext = this.add.text(112, 86, '', textStyle(18, '#e0413a', { stroke: '#0b1412', strokeThickness: 4 })).setDepth(51);
+    this.statusText = this.add.text(24, 130, '', textStyle(22, '#4fe0c8', { stroke: '#0b1412', strokeThickness: 5 })).setDepth(51);
+
+    this.scoreText = this.add.text(W - 28, 22, '0', textStyle(34, COLORS.text, { stroke: '#0b1412', strokeThickness: 6 }))
       .setOrigin(1, 0).setDepth(51);
-    this.muteText = this.add.text(W - 28, 74, Sfx.muted ? 'SOUND OFF' : 'SOUND ON', textStyle(20, COLORS.textDim))
-      .setOrigin(1, 0).setDepth(51).setInteractive({ useHandCursor: true });
-    this.muteText.on('pointerdown', () => {
-      this.muteText.setText(Sfx.toggleMute() ? 'SOUND OFF' : 'SOUND ON');
-    });
+    const best = Store.get('best', null);
+    this.add.text(W - 28, 66, best ? 'BEST ' + best.score : 'SCORE', textStyle(18, COLORS.textDim))
+      .setOrigin(1, 0).setDepth(51);
 
     this.bossBar = this.add.graphics().setDepth(51);
+    this.bossSkull = this.add.image(112, 295, 'skull').setScale(1.15).setDepth(52).setVisible(false);
     this.bossLabel = this.add.text(W / 2, 268, '', textStyle(22, '#e0413a', { stroke: '#0b1412', strokeThickness: 5 }))
       .setOrigin(0.5).setDepth(51);
 
@@ -216,6 +220,40 @@ class GameScene extends Phaser.Scene {
       if (this.drag && p.id === this.drag.id) this.drag = null;
     });
     this.keys = this.input.keyboard.addKeys('LEFT,RIGHT,A,D,SPACE');
+    this.input.keyboard.on('keydown-ESC', () => this.pauseGame());
+    this.input.keyboard.on('keydown-P', () => this.pauseGame());
+
+    // Pause when the player switches apps or tabs.
+    const onHidden = () => this.pauseGame();
+    this.game.events.on(Phaser.Core.Events.HIDDEN, onHidden);
+    this.events.once('shutdown', () => this.game.events.off(Phaser.Core.Events.HIDDEN, onHidden));
+  }
+
+  pauseGame() {
+    if (this.paused || this.s.over) return;
+    this.paused = true;
+    this.drag = null;
+    this.physics.pause();
+    this.tweens.pauseAll();
+    this.time.paused = true;
+    Music.stop();
+    openPause(this, {
+      resume: () => this.resumeGame(),
+      quit: () => this.scene.start('Title'),
+    });
+  }
+
+  resumeGame() {
+    this.paused = false;
+    this.physics.resume();
+    this.tweens.resumeAll();
+    this.time.paused = false;
+    Music.start();
+  }
+
+  // Camera shake that respects the screen shake setting.
+  shake(duration, intensity) {
+    if (Settings.get('shake')) this.cameras.main.shake(duration, intensity);
   }
 
   // ---------------------------------------------------------------- state helpers
@@ -295,6 +333,7 @@ class GameScene extends Phaser.Scene {
   // ---------------------------------------------------------------- main loop
 
   update(time, delta) {
+    if (this.paused) return;
     const dt = Math.min(delta / 1000, 0.05);
     this.elapsed += dt;
     const s = this.s;
@@ -386,7 +425,7 @@ class GameScene extends Phaser.Scene {
       .setScale(0.5 + eff * 0.08);
     this.tweens.add({ targets: f, alpha: 0, scale: f.scale * 1.6, duration: 90, onComplete: () => f.destroy() });
     Sfx.shoot(eff);
-    if (eff > 5) this.cameras.main.shake(50, 0.0004 * eff);
+    if (eff > 5) this.shake(50, 0.0004 * eff);
   }
 
   killBullet(b) {
@@ -527,9 +566,10 @@ class GameScene extends Phaser.Scene {
     this.addSpeed(-0.3 * e.def.bite * this.hero.hitLoss);
     this.burstRed.explode(14, e.x, LINE_Y - 10);
     this.popNumber(this.squadX, LINE_Y - 130, '-' + lost, '#e0413a', 40);
-    this.cameras.main.shake(120, 0.006);
+    this.shake(120, 0.006);
     this.cameras.main.flash(80, 120, 20, 20);
     Sfx.bite();
+    vibrate(40);
     this.setSquad(this.s.squad - lost);
   }
 
@@ -597,7 +637,8 @@ class GameScene extends Phaser.Scene {
     const lost = Math.ceil(this.s.squad * 0.15) + 2;
     this.burstGold.explode(30, b.x, LINE_Y - 20);
     this.popNumber(this.squadX, LINE_Y - 150, 'BARREL CRASH -' + lost, '#e0413a', 36);
-    this.cameras.main.shake(200, 0.01);
+    vibrate(80);
+    this.shake(200, 0.01);
     Sfx.bite();
     this.setSquad(this.s.squad - lost);
   }
@@ -654,7 +695,7 @@ class GameScene extends Phaser.Scene {
     this.s.bossActive = true;
     this.banner('A HORROR APPROACHES', '#e0413a', 'Dodge the red slams');
     Sfx.bossRoar();
-    this.cameras.main.shake(600, 0.008);
+    this.shake(600, 0.008);
   }
 
   updateBoss(dt) {
@@ -663,6 +704,7 @@ class GameScene extends Phaser.Scene {
       this.bossBar.clear();
       this.slamGfx.clear();
       this.bossLabel.setText('');
+      this.bossSkull.setVisible(false);
       return;
     }
     const v = (b.endY - b.startY) / TUNING.bossTime * (this.s.slowTimer > 0 ? 0.45 : 1);
@@ -684,6 +726,7 @@ class GameScene extends Phaser.Scene {
     this.bossBar.fillStyle(COLORS.gold, 1);
     this.bossBar.fillRect(110, 312, (W - 220) * (1 - reach), 5);
     this.bossLabel.setText('HORROR  ' + Math.ceil(b.hp));
+    this.bossSkull.setVisible(true);
 
     if (b.y >= b.endY) this.bossSmash(b);
   }
@@ -715,13 +758,14 @@ class GameScene extends Phaser.Scene {
     const flash = this.add.rectangle(sl.x, (top + H) / 2, SLAM_HALF_W * 2, H - top, 0xffd0c0, 0.7).setDepth(32);
     this.tweens.add({ targets: flash, alpha: 0, duration: 260, onComplete: () => flash.destroy() });
     for (let y = top + 80; y < H; y += 160) this.burstRed.explode(8, sl.x, y);
-    this.cameras.main.shake(220, 0.012);
+    this.shake(220, 0.012);
     Sfx.noise(0.4, 0.2, 0, 300, 'lowpass');
 
     if (Math.abs(this.squadX - sl.x) < SLAM_HALF_W + this.squadSpread() * 0.4) {
       const lost = Math.ceil(this.s.squad * 0.2) + 2;
       this.addSpeed(-0.8 * this.hero.hitLoss);
       this.popNumber(this.squadX, LINE_Y - 150, 'SLAMMED -' + lost, '#e0413a', 40);
+      vibrate(120);
       Sfx.bite();
       this.setSquad(this.s.squad - lost);
     } else {
@@ -744,11 +788,12 @@ class GameScene extends Phaser.Scene {
     this.addSpeed(-2 * this.hero.hitLoss);
     this.burstRed.explode(60, this.squadX, LINE_Y - 40);
     this.popNumber(this.squadX, LINE_Y - 150, '-' + lost, '#e0413a', 56);
-    this.cameras.main.shake(500, 0.02);
+    this.shake(500, 0.02);
     this.cameras.main.flash(200, 160, 20, 20);
     Sfx.bite();
     Sfx.bossRoar();
     this.banner('IT BROKE THROUGH', '#e0413a');
+    vibrate(250);
     this.setSquad(this.s.squad - lost);
   }
 
@@ -760,7 +805,7 @@ class GameScene extends Phaser.Scene {
     this.addSpeed(1.5);
     this.burstRed.explode(80, b.x, b.y);
     this.burstGold.explode(60, b.x, b.y);
-    this.cameras.main.shake(400, 0.015);
+    this.shake(400, 0.015);
     this.cameras.main.flash(150, 255, 220, 140);
     Sfx.bossDown();
     this.banner('HORROR SLAIN', '#f2c14e', 'Fire rate +1.5');
@@ -937,8 +982,9 @@ class GameScene extends Phaser.Scene {
       Sfx.gateGood();
     } else {
       this.burstRed.explode(30, this.squadX, LINE_Y - 20);
-      this.cameras.main.shake(150, 0.006);
+      this.shake(150, 0.006);
       Sfx.gateBad();
+      vibrate(40);
     }
   }
 
@@ -1057,9 +1103,11 @@ class GameScene extends Phaser.Scene {
     this.waveText.setText('WAVE ' + this.s.wave);
     this.waveBar.clear();
     this.waveBar.fillStyle(0x0a1310, 0.85);
-    this.waveBar.fillRect(28, 74, 190, 10);
+    this.waveBar.fillRoundedRect(112, 66, 170, 12, 6);
     this.waveBar.fillStyle(COLORS.gold, 1);
-    this.waveBar.fillRect(28, 74, 190 * (this.s.bossActive ? 1 : this.s.waveTime / TUNING.waveLength), 10);
+    this.waveBar.fillRoundedRect(112, 66, Math.max(12, 170 * (this.s.bossActive ? 1 : this.s.waveTime / TUNING.waveLength)), 12, 6);
+    const toBoss = TUNING.bossEvery - (this.s.wave % TUNING.bossEvery);
+    this.bossNext.setText(this.s.bossActive ? 'HORROR ATTACKING' : toBoss === 1 ? 'HORROR NEXT WAVE' : 'HORROR IN ' + toBoss + ' WAVES');
     this.scoreText.setText(String(this.s.score));
 
     const status = [];
@@ -1095,9 +1143,11 @@ class GameScene extends Phaser.Scene {
     this.s.over = true;
     Music.stop();
     Sfx.lose();
+    vibrate([100, 60, 200]);
     this.physics.pause();
+    this.pauseBtn.setVisible(false);
     this.slamGfx.clear();
-    this.cameras.main.shake(400, 0.012);
+    this.shake(400, 0.012);
     this.squadLabel.setText('0');
     this.banner('FALLEN', '#e0413a');
     const s = this.s;

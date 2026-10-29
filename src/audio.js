@@ -4,18 +4,23 @@
 const Sfx = {
   ctx: null,
   master: null,
-  muted: false,
+  musicBus: null,
+  sfxBus: null,
   lastShot: 0,
 
   init() {
     if (this.ctx) return;
-    this.muted = Store.get('muted', false);
     try {
       const Ctx = window.AudioContext || window.webkitAudioContext;
       this.ctx = new Ctx();
       this.master = this.ctx.createGain();
-      this.master.gain.value = this.muted ? 0 : 0.45;
+      this.master.gain.value = 0.5;
       this.master.connect(this.ctx.destination);
+      this.musicBus = this.ctx.createGain();
+      this.sfxBus = this.ctx.createGain();
+      this.musicBus.connect(this.master);
+      this.sfxBus.connect(this.master);
+      this.applyVolumes();
     } catch (e) {
       this.ctx = null;
     }
@@ -26,18 +31,18 @@ const Sfx = {
     if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
   },
 
-  toggleMute() {
-    this.muted = !this.muted;
-    Store.set('muted', this.muted);
-    if (this.master) this.master.gain.value = this.muted ? 0 : 0.45;
-    return this.muted;
+  // Reads the music and sound effect volumes from Settings.
+  applyVolumes() {
+    if (!this.ctx) return;
+    this.musicBus.gain.value = Settings.get('music');
+    this.sfxBus.gain.value = Settings.get('sfx');
   },
 
   now() {
     return this.ctx ? this.ctx.currentTime : 0;
   },
 
-  tone(freq, dur, type, vol, t, slideTo) {
+  tone(freq, dur, type, vol, t, slideTo, bus) {
     if (!this.ctx) return;
     t = t || this.ctx.currentTime;
     const osc = this.ctx.createOscillator();
@@ -48,12 +53,12 @@ const Sfx = {
     gain.gain.setValueAtTime(vol, t);
     gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     osc.connect(gain);
-    gain.connect(this.master);
+    gain.connect(bus || this.sfxBus);
     osc.start(t);
     osc.stop(t + dur + 0.02);
   },
 
-  noise(dur, vol, t, filterFreq, filterType) {
+  noise(dur, vol, t, filterFreq, filterType, bus) {
     if (!this.ctx) return;
     t = t || this.ctx.currentTime;
     if (!this.noiseBuffer) {
@@ -72,7 +77,7 @@ const Sfx = {
     gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     src.connect(filter);
     filter.connect(gain);
-    gain.connect(this.master);
+    gain.connect(bus || this.sfxBus);
     src.start(t);
     src.stop(t + dur + 0.02);
   },
@@ -126,6 +131,10 @@ const Sfx = {
     [392, 523, 659, 784].forEach((f, i) => this.tone(f, 0.3, 'triangle', 0.12, t + i * 0.09));
   },
 
+  click() {
+    this.tone(660, 0.05, 'triangle', 0.08);
+  },
+
   surge() {
     this.tone(300, 0.5, 'square', 0.08, 0, 1800);
   },
@@ -168,10 +177,11 @@ const Music = {
   },
 
   playStep(s, t, speed) {
-    if (s % 4 === 0) Sfx.tone(110, 0.18, 'sine', 0.22, t, 40);
-    if (s % 8 === 4) Sfx.noise(0.12, 0.08, t, 1800, 'bandpass');
-    if (s % 2 === 1) Sfx.noise(0.03, speed > 4 ? 0.035 : 0.02, t, 7000);
-    if (s % 2 === 0) Sfx.tone(this.bass[(s / 2) % 8], 0.2, 'triangle', 0.09, t);
-    if (speed > 6 && s % 4 === 2) Sfx.tone(this.bass[(s / 2) % 8] * 4, 0.08, 'square', 0.025, t);
+    const bus = Sfx.musicBus;
+    if (s % 4 === 0) Sfx.tone(110, 0.18, 'sine', 0.22, t, 40, bus);
+    if (s % 8 === 4) Sfx.noise(0.12, 0.08, t, 1800, 'bandpass', bus);
+    if (s % 2 === 1) Sfx.noise(0.03, speed > 4 ? 0.035 : 0.02, t, 7000, 'highpass', bus);
+    if (s % 2 === 0) Sfx.tone(this.bass[(s / 2) % 8], 0.2, 'triangle', 0.09, t, 0, bus);
+    if (speed > 6 && s % 4 === 2) Sfx.tone(this.bass[(s / 2) % 8] * 4, 0.08, 'square', 0.025, t, 0, bus);
   },
 };

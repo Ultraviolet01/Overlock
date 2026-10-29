@@ -74,6 +74,22 @@ function makeTextures(scene) {
     }
   });
 
+  // Skull marker for the boss health bar and the next-horror progress bar.
+  bake('skull', 40, 40, (g) => {
+    g.fillStyle(0x0b0b0b, 1);
+    g.fillCircle(20, 17, 16);
+    g.fillRoundedRect(10, 22, 20, 16, 4);
+    g.fillStyle(0xf3efc8, 1);
+    g.fillCircle(20, 17, 13);
+    g.fillRoundedRect(13, 22, 14, 13, 3);
+    g.fillStyle(0x0b0b0b, 1);
+    g.fillCircle(14, 17, 4);
+    g.fillCircle(26, 17, 4);
+    g.fillTriangle(20, 21, 17, 26, 23, 26);
+    g.fillRect(16, 30, 2, 5);
+    g.fillRect(22, 30, 2, 5);
+  });
+
   bake('dot', 8, 8, (g) => {
     g.fillStyle(0xffffff, 1);
     g.fillCircle(4, 4, 4);

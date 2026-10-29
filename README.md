@@ -25,10 +25,19 @@ A portrait, one-thumb horde shooter built for Slapjam AI 2. The jam theme is **S
 - **Bulwark:** slower fire, but hits barely slow you down.
 - **Surge:** tap the SURGE button (or Space) to double all speed for 5 seconds, every 20 seconds.
 
+## Screens and settings
+
+- **Title:** settings gear (top left), how to play (top right), best run card, captain picker, big PLAY button.
+- **How to play:** an illustrated guide to steering, fire rate, cards, barrels, champions and the horror. It opens on the first launch.
+- **Settings:** music and sound effect volume, vibration, screen shake, reset best run, and the version number. Reachable from the title and the pause menu.
+- **In game:** pause button (top left), wave and wave progress, how many waves until the next horror, the fire rate gauge, score and best score. During a boss, a skull health bar.
+- **Pause menu:** resume, how to play, settings, quit to title. The game also pauses by itself when you switch apps or tabs.
+- **End screen:** progress bar to the next horror, six stat cards, RUN AGAIN and CHANGE CAPTAIN.
+
 ## Controls
 
-- Phone: drag anywhere to steer, tap SURGE for the ability.
-- Desktop: drag with the mouse, or use the arrow keys or A/D. Space triggers SURGE. Keys 1, 2, 3 pick a captain on the title screen.
+- Phone: drag anywhere to steer, tap SURGE for the ability, tap the pause button to pause.
+- Desktop: drag with the mouse, or use the arrow keys or A/D. Space triggers SURGE. Escape or P pauses. Keys 1, 2, 3 pick a captain and Enter starts on the title screen.
 
 ## Tech
 
@@ -69,7 +78,8 @@ python3 -m http.server 8000
 
 - `index.html`: page shell, loads the scripts.
 - `src/config.js`: tuning values, captains, colors, helpers.
-- `src/audio.js`: sound effects and the speed-linked music.
+- `src/audio.js`: sound effects and the speed-linked music, with separate volumes.
+- `src/ui.js`: buttons, pop-up panels, sliders and toggles, plus the settings, how to play and pause panels.
 - `assets/`: AI-generated character sprites.
 - `src/textures.js`: draws the bolts, road, barrels and effects.
 - `src/scenes/`: boot, title, game and game over screens.

@@ -1,5 +1,7 @@
 // Shared constants, tuning values and small helpers.
 
+const VERSION = '0.3.0';
+
 const W = 720;
 const H = 1280;
 
@@ -41,6 +43,7 @@ const HEROES = {
     key: 'blitz',
     name: 'BLITZ',
     role: 'Fastest fire rate, light bolts',
+    short: 'Fastest fire',
     interval: 0.38,
     damage: 0.7,
     hitLoss: 1,
@@ -51,6 +54,7 @@ const HEROES = {
     key: 'tank',
     name: 'BULWARK',
     role: 'Slow fire, hits barely slow you',
+    short: 'Shrugs off hits',
     interval: 0.55,
     damage: 1.2,
     hitLoss: 0.25,
@@ -61,6 +65,7 @@ const HEROES = {
     key: 'surge',
     name: 'SURGE',
     role: 'Tap SURGE to double all speed for 5s',
+    short: 'Double speed',
     interval: 0.48,
     damage: 0.95,
     hitLoss: 1,
@@ -86,6 +91,37 @@ const Store = {
     }
   },
 };
+
+// Player options, saved on the device.
+const Settings = {
+  data: null,
+  defaults: { music: 0.7, sfx: 1, vibration: true, shake: true },
+
+  load() {
+    this.data = Object.assign({}, this.defaults, Store.get('settings', {}));
+    return this.data;
+  },
+
+  get(key) {
+    if (!this.data) this.load();
+    return this.data[key];
+  },
+
+  set(key, value) {
+    if (!this.data) this.load();
+    this.data[key] = value;
+    Store.set('settings', this.data);
+  },
+};
+
+function vibrate(ms) {
+  if (!Settings.get('vibration') || !navigator.vibrate) return;
+  try {
+    navigator.vibrate(ms);
+  } catch (e) {
+    // Some browsers block vibration inside iframes.
+  }
+}
 
 function clamp(v, lo, hi) {
   return v < lo ? lo : v > hi ? hi : v;

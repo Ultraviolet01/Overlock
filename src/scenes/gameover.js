@@ -1,4 +1,4 @@
-// End of run: stats, best run, and buttons to go again.
+// End of run: how close you got to the next horror, stat cards, and buttons to go again.
 
 class GameOverScene extends Phaser.Scene {
   constructor() {
@@ -12,56 +12,68 @@ class GameOverScene extends Phaser.Scene {
   create() {
     const r = this.result;
     this.add.tileSprite(W / 2, H / 2, W, H, 'road').setTint(0x5f6f6a);
-    this.add.rectangle(W / 2, H / 2, W, H, COLORS.bg, 0.55);
 
     const prev = Store.get('best', null);
     const isBest = !prev || r.score > prev.score;
     if (isBest) Store.set('best', { wave: r.wave, topSpeed: r.topSpeed, score: r.score, maxSquad: r.maxSquad });
 
-    this.add.text(W / 2, 220, 'THE HORDE CAUGHT YOU', textStyle(52, '#e0413a', { stroke: '#0b1412', strokeThickness: 8 })).setOrigin(0.5);
+    const panel = uiModal(this, 640, 1060, 'WAVE ' + r.wave);
+    panel.y = H / 2 - 20;
+    const add = (o) => {
+      panel.add(o);
+      return o;
+    };
+
+    add(this.add.text(0, -440, 'THE HORDE BROKE THROUGH', textStyle(38, '#e0413a', { stroke: '#0b1412', strokeThickness: 6 })).setOrigin(0.5));
     if (isBest) {
-      const nb = this.add.text(W / 2, 300, 'NEW BEST RUN', textStyle(34, '#f2c14e')).setOrigin(0.5);
+      const nb = add(this.add.text(0, -385, 'NEW BEST RUN', textStyle(30, '#f2c14e')).setOrigin(0.5));
       this.tweens.add({ targets: nb, scale: 1.12, duration: 420, yoyo: true, repeat: -1 });
+    } else {
+      add(this.add.text(0, -385, 'Best: ' + prev.score + ' pts, wave ' + prev.wave,
+        textStyle(24, COLORS.textDim, { fontStyle: 'normal' })).setOrigin(0.5));
     }
 
-    const rows = [
-      ['Wave reached', String(r.wave)],
-      ['Top fire rate', 'x' + r.topSpeed.toFixed(1)],
-      ['Biggest squad', String(r.maxSquad)],
-      ['Horde slain', String(r.kills)],
-      ['Bosses felled', String(r.bosses)],
-      ['Score', String(r.score)],
+    // Progress toward the next horror, like a level progress bar.
+    const every = TUNING.bossEvery;
+    const base = Math.floor((r.wave - 1) / every) * every;
+    const nextBoss = base + every;
+    const progress = clamp((r.wave - base) / every, 0, 1);
+    const g = add(this.add.graphics());
+    g.fillStyle(0x0a1310, 1);
+    g.fillRoundedRect(-240, -320, 440, 30, 15);
+    g.fillStyle(COLORS.gold, 1);
+    g.fillRoundedRect(-240, -320, Math.max(30, 440 * progress), 30, 15);
+    add(this.add.text(-20, -305, Math.round(progress * 100) + '%', textStyle(20, '#0b1412')).setOrigin(0.5));
+    add(this.add.image(235, -305, 'skull').setScale(1.1));
+    const atBoss = r.wave % every === 0;
+    add(this.add.text(0, -265, atBoss ? 'YOU REACHED THE HORROR' : 'NEXT HORROR: WAVE ' + nextBoss,
+      textStyle(20, COLORS.textDim)).setOrigin(0.5));
+
+    const cards = [
+      ['TOP FIRE RATE', 'x' + r.topSpeed.toFixed(1), '#4fc3ff'],
+      ['BIGGEST SQUAD', String(r.maxSquad), COLORS.text],
+      ['WAVE REACHED', String(r.wave), '#f2c14e'],
+      ['HORDE SLAIN', String(r.kills), COLORS.text],
+      ['HORRORS SLAIN', String(r.bosses), COLORS.text],
+      ['SCORE', String(r.score), '#f2c14e'],
     ];
-    rows.forEach((row, i) => {
-      const y = 420 + i * 72;
-      this.add.text(150, y, row[0], textStyle(32, COLORS.textDim, { fontStyle: 'normal' })).setOrigin(0, 0.5);
-      this.add.text(W - 150, y, row[1], textStyle(40, i === 1 ? '#4fc3ff' : COLORS.text)).setOrigin(1, 0.5);
+    cards.forEach((c, i) => {
+      const x = (i % 2 === 0 ? -1 : 1) * 135;
+      const y = -150 + Math.floor(i / 2) * 140;
+      const cg = add(this.add.graphics());
+      cg.fillStyle(0x1d2a26, 1);
+      cg.fillRoundedRect(x - 125, y - 58, 250, 116, 16);
+      cg.lineStyle(2, COLORS.knight, 0.35);
+      cg.strokeRoundedRect(x - 125, y - 58, 250, 116, 16);
+      add(this.add.text(x, y - 28, c[0], textStyle(18, COLORS.textDim)).setOrigin(0.5));
+      add(this.add.text(x, y + 14, c[1], textStyle(44, c[2])).setOrigin(0.5));
     });
 
-    if (prev && !isBest) {
-      this.add.text(W / 2, 880, `Best: ${prev.score} pts, wave ${prev.wave}`, textStyle(24, COLORS.textDim, { fontStyle: 'normal' })).setOrigin(0.5);
-    }
+    const again = () => this.scene.start('Game', { hero: r.hero });
+    add(uiButton(this, 0, 320, 460, 112, 'RUN AGAIN', COLORS.gold, again, { size: 46 }));
+    add(uiButton(this, 0, 450, 460, 88, 'CHANGE CAPTAIN', 0x2f7f74, () => this.scene.start('Title'), { size: 30, textColor: '#ffffff' }));
 
-    this.button(W / 2, 990, 'RUN AGAIN', COLORS.knight, () => this.scene.start('Game', { hero: r.hero }));
-    this.button(W / 2, 1120, 'CHANGE CAPTAIN', 0x8fa8a0, () => this.scene.start('Title'));
-
-    this.input.keyboard.once('keydown-SPACE', () => this.scene.start('Game', { hero: r.hero }));
-  }
-
-  button(x, y, label, color, onTap) {
-    const c = this.add.container(x, y);
-    const bg = this.add.graphics();
-    bg.fillStyle(0x13201c, 0.95);
-    bg.fillRoundedRect(-230, -48, 460, 96, 18);
-    bg.lineStyle(4, color, 1);
-    bg.strokeRoundedRect(-230, -48, 460, 96, 18);
-    const t = this.add.text(0, 0, label, textStyle(36, COLORS.text)).setOrigin(0.5);
-    c.add([bg, t]);
-    c.setSize(460, 96);
-    c.setInteractive({ useHandCursor: true });
-    c.on('pointerdown', () => {
-      Sfx.resume();
-      onTap();
-    });
+    this.input.keyboard.once('keydown-SPACE', again);
+    this.input.keyboard.once('keydown-ENTER', again);
   }
 }
