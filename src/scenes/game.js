@@ -2,14 +2,14 @@
 
 // scale is the sprite's display scale; r is the hit radius in screen pixels.
 const ENEMIES = {
-  walker: { key: 'walker', scale: 0.6, hp: 3, speed: 110, r: 28, bite: 1, pts: 10, gain: 0.025 },
-  sprinter: { key: 'sprinter', scale: 0.55, hp: 1.6, speed: 270, r: 24, bite: 1, pts: 15, gain: 0.04 },
-  brute: { key: 'brute', scale: 0.72, hp: 16, speed: 70, r: 54, bite: 4, pts: 50, gain: 0.12 },
+  walker: { key: 'walker', scale: 0.72, hp: 3, speed: 140, r: 28, bite: 1, pts: 10, gain: 0.025 },
+  sprinter: { key: 'sprinter', scale: 0.66, hp: 1.6, speed: 330, r: 24, bite: 1, pts: 15, gain: 0.04 },
+  brute: { key: 'brute', scale: 0.86, hp: 16, speed: 90, r: 54, bite: 4, pts: 50, gain: 0.12 },
 };
 
 const UNIT = {
-  knight: { key: 'knight', scale: 0.44 },
-  champion: { key: 'champion', scale: 0.5 },
+  knight: { key: 'knight', scale: 0.56 },
+  champion: { key: 'champion', scale: 0.62 },
 };
 
 const MERGE_SIZE = 10;         // this many knights merge into one champion
@@ -18,9 +18,31 @@ const MAX_CHAMPIONS = 30;
 const SQUAD_MIN_X = 110;
 const CARD_W = 268;
 const CARD_H = 140;
-const BOSS_SCALE = 0.8;
+const BOSS_SCALE = 0.95;
 const SLAM_HALF_W = 95;
 const MAX_SQUAD_RADIUS = 120; // keeps a big crowd narrow enough to dodge
+
+// Camera: behind and above the squad, looking down the road at an angle, like
+// Last War's battle view. The game logic stays in flat world coordinates
+// (x across the road, y down the road, the squad at LINE_Y). At draw time every
+// world object is projected: far things shrink toward the top, near things grow,
+// and the road leans slightly to one side.
+const VIEW = {
+  horizon: -500,   // screen y the road would meet at infinite distance
+  base: 880,       // screen y of the squad line
+  depth: 900,      // camera distance; smaller means stronger perspective
+  skew: 0.12,      // lean of the road, in screen x per screen y
+  far: -520,       // world y at the top of the screen; things spawn just above it
+  near: 1320,      // world y at the bottom of the screen
+};
+
+function project(wx, wy) {
+  const z = LINE_Y - wy;
+  const s = VIEW.depth / (VIEW.depth + z);
+  const y = VIEW.horizon + (VIEW.base - VIEW.horizon) * s;
+  const x = W / 2 + (wx - W / 2) * s + (y - VIEW.base) * VIEW.skew;
+  return { x, y, s };
+}
 
 function lerpColor(a, b, t) {
   const ar = (a >> 16) & 255, ag = (a >> 8) & 255, ab = a & 255;
@@ -96,7 +118,17 @@ class GameScene extends Phaser.Scene {
   // ---------------------------------------------------------------- setup
 
   createWorld() {
-    this.road = this.add.tileSprite(W / 2, H / 2, W, H, 'road').setDepth(0);
+    this.ground = this.add.graphics().setDepth(0);
+    this.roadScroll = 0;
+    this.trees = [];
+    for (let i = 0; i < 26; i++) {
+      const left = i % 2 === 0;
+      const t = this.add.image(0, 0, 'tree').setOrigin(0.5, 0.95).setDepth(3);
+      t.x = left ? -10 - Math.random() * 70 : W + 10 + Math.random() * 70;
+      t.y = VIEW.far + (i / 26) * (VIEW.near - VIEW.far + 200);
+      t.setScale(1.2 + Math.random() * 0.5);
+      this.trees.push(t);
+    }
 
     this.streaks = [];
     for (let i = 0; i < 34; i++) {
@@ -106,19 +138,124 @@ class GameScene extends Phaser.Scene {
     }
     this.embers = [];
     for (let i = 0; i < 40; i++) {
-      const e = this.add.image(Math.random() * W, Math.random() * H, 'dot').setDepth(2)
+      const e = this.add.image(Math.random() * W, VIEW.far + Math.random() * (VIEW.near - VIEW.far), 'dot').setDepth(2)
         .setTint(COLORS.ember).setBlendMode(Phaser.BlendModes.ADD).setScale(0.3 + Math.random() * 0.5);
       e.drift = Math.random() * Math.PI * 2;
       this.embers.push(e);
     }
     this.add.image(W / 2, 0, 'fog').setOrigin(0.5, 0).setDepth(45);
+
+    this.events.on('prerender', this.projectAll, this);
+    this.events.on('render', this.restoreAll, this);
+  }
+
+  // Before drawing, move every world object to its projected screen spot and
+  // scale it by distance; after drawing, put the world coordinates back so
+  // physics and game logic never see screen coordinates.
+  projectAll() {
+    const list = this.projected || (this.projected = []);
+    list.length = 0;
+    const add = (o, depthFromY) => {
+      if (!o || !o.visible) return;
+      list.push(o);
+      o._w = [o.x, o.y, o.scaleX, o.scaleY];
+      const p = project(o.x, o.y);
+      o.x = p.x;
+      o.y = p.y;
+      o.setScale(o._w[2] * p.s, o._w[3] * p.s);
+      if (depthFromY) o.setDepth(10 + (o._w[1] + 1000) / 10000);
+    };
+    this.trees.forEach((o) => add(o));
+    this.streaks.forEach((o) => add(o));
+    this.embers.forEach((o) => add(o));
+    this.gateRows.forEach((row) => row.cards.forEach((c) => add(c)));
+    this.barrels.getChildren().forEach((o) => { add(o, true); add(o.hpText); });
+    this.enemies.getChildren().forEach((o) => { add(o, true); add(o.hpText); });
+    this.bosses.getChildren().forEach((o) => add(o, true));
+    this.knights.forEach((o) => add(o, true));
+    this.bullets.getChildren().forEach((o) => add(o));
+    add(this.squadLabel);
+  }
+
+  restoreAll() {
+    const list = this.projected;
+    if (!list) return;
+    for (let i = 0; i < list.length; i++) {
+      const o = list[i];
+      o.x = o._w[0];
+      o.y = o._w[1];
+      o.setScale(o._w[2], o._w[3]);
+    }
+    list.length = 0;
+  }
+
+  // Particle bursts live in screen space, so project the world point first.
+  explode(emitter, count, wx, wy) {
+    const p = project(wx, wy);
+    emitter.explode(count, p.x, p.y);
+  }
+
+  // The road, drawn in perspective every frame: dark forest floor, the stone
+  // road narrowing toward the top, scrolling stone joints and dark curbs.
+  drawGround() {
+    const g = this.ground;
+    g.clear();
+    g.fillStyle(0x0d1a15, 1);
+    g.fillRect(0, 0, W, H);
+    const top = VIEW.far - 40;
+    const bot = VIEW.near + 40;
+    const corner = (x, y) => project(x, y);
+    const tl = corner(80, top);
+    const tr = corner(640, top);
+    const br = corner(640, bot);
+    const bl = corner(80, bot);
+    g.fillStyle(0x2a3431, 1);
+    g.fillPoints([tl, tr, br, bl].map((p) => new Phaser.Geom.Point(p.x, p.y)), true);
+
+    // Stone joints: rows every 64 world units, staggered vertical joints.
+    const step = 64;
+    const off = this.roadScroll % step;
+    g.lineStyle(3, 0x1b2421, 1);
+    let row = Math.floor(this.roadScroll / step);
+    for (let y = top - step + off; y < bot; y += step) {
+      row--;
+      const a = corner(80, y);
+      const b = corner(640, y);
+      g.lineBetween(a.x, a.y, b.x, b.y);
+      const shift = (row & 1) ? 45 : 0;
+      for (let x = 80 + 90 - shift; x < 640; x += 90) {
+        const c = corner(x, y);
+        const d = corner(x, y + step);
+        g.lineBetween(c.x, c.y, d.x, d.y);
+      }
+    }
+    // Lane dashes down the middle, like road markings, moving with speed.
+    g.fillStyle(0x56625e, 1);
+    for (let y = top - 160 + (this.roadScroll % 160); y < bot; y += 160) {
+      const a = corner(352, y);
+      const b = corner(368, y);
+      const c = corner(368, y + 70);
+      const d = corner(352, y + 70);
+      g.fillPoints([a, b, c, d].map((p) => new Phaser.Geom.Point(p.x, p.y)), true);
+    }
+    // Curbs.
+    g.lineStyle(10, 0x08120e, 1);
+    g.lineBetween(tl.x, tl.y, bl.x, bl.y);
+    g.lineBetween(tr.x, tr.y, br.x, br.y);
+    g.lineStyle(4, 0x3e4a46, 1);
+    const tl2 = corner(86, top);
+    const bl2 = corner(86, bot);
+    const tr2 = corner(634, top);
+    const br2 = corner(634, bot);
+    g.lineBetween(tl2.x, tl2.y, bl2.x, bl2.y);
+    g.lineBetween(tr2.x, tr2.y, br2.x, br2.y);
   }
 
   resetStreak(s, anywhere) {
     const side = Math.random() < 0.5;
     s.x = side ? 20 + Math.random() * 90 : W - 20 - Math.random() * 90;
     if (Math.random() < 0.3) s.x = 100 + Math.random() * (W - 200);
-    s.y = anywhere ? Math.random() * H : -100 - Math.random() * 300;
+    s.y = anywhere ? VIEW.far + Math.random() * (VIEW.near - VIEW.far) : VIEW.far - 100 - Math.random() * 300;
     s.setScale(1, 0.6 + Math.random() * 1.2);
     s.setTint(Math.random() < 0.7 ? COLORS.knight : COLORS.ember);
   }
@@ -204,7 +341,7 @@ class GameScene extends Phaser.Scene {
 
     // Boss bar: a huge outlined number sitting on a fat red bar.
     this.bossBar = this.add.graphics().setDepth(51);
-    this.bossNum = this.add.text(W / 2, 214, '', textStyle(72, '#ffffff', { fontStyle: 'italic' }))
+    this.bossNum = this.add.text(W / 2, 170, '', textStyle(54, '#ffffff', { fontStyle: 'italic' }))
       .setOrigin(0.5).setDepth(52).setVisible(false);
 
     // Fire rate meter at the bottom: flame, big slanted number, fat bar.
@@ -314,12 +451,12 @@ class GameScene extends Phaser.Scene {
     const champs = Math.min(MAX_CHAMPIONS, Math.floor(n / MERGE_SIZE));
     const singles = Math.min(MERGE_SIZE - 1, n - champs * MERGE_SIZE);
     if (!silent && champs > this.champions) {
-      this.burstBlue.explode(24, this.squadX, LINE_Y - 20);
+      this.explode(this.burstBlue, 24, this.squadX, LINE_Y - 20);
       this.popNumber(this.squadX, LINE_Y - 290, 'CHAMPION RISES', '#4fc3ff', 30);
     }
     this.champions = champs;
     this.units = champs + singles;
-    const base = champs > 0 ? 34 : 26;
+    const base = champs > 0 ? 40 : 32;
     this.spacing = this.units > 1 ? Math.min(base, MAX_SQUAD_RADIUS / Math.sqrt(this.units - 1)) : base;
     for (let i = 0; i < this.knights.length; i++) {
       const k = this.knights[i];
@@ -440,7 +577,8 @@ class GameScene extends Phaser.Scene {
       b.lastHit = null;
     }
     const kn = this.knights[Math.floor(Math.random() * shown)];
-    const f = this.add.image(kn.x, kn.y - 30, 'flash').setDepth(31).setBlendMode(Phaser.BlendModes.ADD)
+    const fp = project(kn.x, kn.y - 30);
+    const f = this.add.image(fp.x, fp.y, 'flash').setDepth(31).setBlendMode(Phaser.BlendModes.ADD)
       .setScale(0.5 + eff * 0.08);
     this.tweens.add({ targets: f, alpha: 0, scale: f.scale * 1.6, duration: 90, onComplete: () => f.destroy() });
     Sfx.shoot(eff);
@@ -456,7 +594,7 @@ class GameScene extends Phaser.Scene {
     for (let i = 0; i < list.length; i++) {
       const b = list[i];
       if (!b.active) continue;
-      if (b.y < -60) {
+      if (b.y < VIEW.far - 60) {
         this.killBullet(b);
         continue;
       }
@@ -510,10 +648,10 @@ class GameScene extends Phaser.Scene {
 
   spawnEnemy(type, x) {
     const def = ENEMIES[type];
-    const e = this.enemies.get(x, -70, def.key);
+    const e = this.enemies.get(x, VIEW.far - 40, def.key);
     if (!e) return;
     e.setTexture(def.key);
-    e.enableBody(true, x, -70, true, true);
+    e.enableBody(true, x, VIEW.far - 40, true, true);
     e.setScale(def.scale);
     const rt = def.r / def.scale;
     e.setCircle(rt, e.width / 2 - rt, e.height / 2 - rt);
@@ -595,7 +733,7 @@ class GameScene extends Phaser.Scene {
     const lost = e.def.bite * Math.ceil(this.s.wave / 3);
     e.disableBody(true, true);
     this.addSpeed(-0.3 * e.def.bite * this.hero.hitLoss);
-    this.burstRed.explode(14, e.x, LINE_Y - 10);
+    this.explode(this.burstRed, 14, e.x, LINE_Y - 10);
     this.popNumber(this.squadX, LINE_Y - 230, '-' + lost, '#e0413a', 40);
     this.shake(120, 0.006);
     this.cameras.main.flash(80, 120, 20, 20);
@@ -616,7 +754,7 @@ class GameScene extends Phaser.Scene {
     this.s.kills++;
     this.s.score += e.def.pts * Math.ceil(eff);
     this.addSpeed(e.def.gain);
-    (e.def.key === 'sprinter' ? this.burstRot : this.burstRed).explode(e.def.key === 'brute' ? 26 : 10, e.x, e.y);
+    this.explode(e.def.key === 'sprinter' ? this.burstRot : this.burstRed, e.def.key === 'brute' ? 26 : 10, e.x, e.y);
     Sfx.kill();
   }
 
@@ -625,9 +763,9 @@ class GameScene extends Phaser.Scene {
   // A barrel rolls down a lane. Break it for an upgrade, or it crashes into the squad.
   spawnBarrel() {
     const x = 150 + Math.random() * (W - 300);
-    const b = this.barrels.get(x, -60, 'barrel');
+    const b = this.barrels.get(x, VIEW.far - 40, 'barrel');
     if (!b) return;
-    b.enableBody(true, x, -60, true, true);
+    b.enableBody(true, x, VIEW.far - 40, true, true);
     b.setCircle(34, b.width / 2 - 34, b.height / 2 - 34);
     b.setDepth(9).clearTint().setScale(1).setAngle(0);
     b.isBarrel = true;
@@ -670,7 +808,7 @@ class GameScene extends Phaser.Scene {
   barrelCrash(b) {
     b.disableBody(true, true);
     const lost = Math.ceil(this.s.squad * 0.15) + 2;
-    this.burstGold.explode(30, b.x, LINE_Y - 20);
+    this.explode(this.burstGold, 30, b.x, LINE_Y - 20);
     this.popNumber(this.squadX, LINE_Y - 250, 'BARREL CRASH -' + lost, '#e0413a', 36);
     vibrate(80);
     this.shake(200, 0.01);
@@ -698,8 +836,8 @@ class GameScene extends Phaser.Scene {
       msg = '+' + n + ' KNIGHTS';
       this.setSquad(s.squad + n);
     }
-    this.burstGold.explode(40, b.x, b.y);
-    this.burstBlue.explode(30, b.x, b.y);
+    this.explode(this.burstGold, 40, b.x, b.y);
+    this.explode(this.burstBlue, 30, b.x, b.y);
     this.popNumber(b.x, b.y - 40, msg, '#4fe0c8', 34);
     this.addSpeed(0.3);
     Sfx.gateGood();
@@ -708,9 +846,9 @@ class GameScene extends Phaser.Scene {
   // ---------------------------------------------------------------- boss
 
   spawnBoss() {
-    const b = this.bosses.get(W / 2, -220, 'boss');
+    const b = this.bosses.get(W / 2, VIEW.far - 120, 'boss');
     if (!b) return;
-    b.enableBody(true, W / 2, -220, true, true);
+    b.enableBody(true, W / 2, VIEW.far - 120, true, true);
     b.setScale(BOSS_SCALE);
     const rt = 125 / BOSS_SCALE;
     b.setCircle(rt, b.width / 2 - rt, b.height / 2 - rt - 20);
@@ -722,7 +860,7 @@ class GameScene extends Phaser.Scene {
     b.dmgAcc = 0;
     b.lastNum = 0;
     b.hitFlash = 0;
-    b.startY = -220;
+    b.startY = VIEW.far - 120;
     b.endY = LINE_Y - 260;
     b.slamTimer = 2.5;
     this.boss = b;
@@ -772,18 +910,24 @@ class GameScene extends Phaser.Scene {
     }
     const sl = this.slam;
     sl.t -= dt;
-    const top = Math.max(0, b.y);
+    const top = Math.max(VIEW.far, b.y);
+    const lane = [
+      project(sl.x - SLAM_HALF_W, top), project(sl.x + SLAM_HALF_W, top),
+      project(sl.x + SLAM_HALF_W, VIEW.near), project(sl.x - SLAM_HALF_W, VIEW.near),
+    ].map((p) => new Phaser.Geom.Point(p.x, p.y));
     const pulse = 0.18 + 0.14 * Math.sin(this.elapsed * 30);
     g.fillStyle(COLORS.horde, pulse + (1 - sl.t / sl.warn) * 0.2);
-    g.fillRect(sl.x - SLAM_HALF_W, top, SLAM_HALF_W * 2, H - top);
+    g.fillPoints(lane, true);
     g.lineStyle(4, COLORS.horde, 0.9);
-    g.strokeRect(sl.x - SLAM_HALF_W, top, SLAM_HALF_W * 2, H - top);
+    g.strokePoints(lane, true);
     if (sl.t > 0) return;
 
     this.slam = null;
-    const flash = this.add.rectangle(sl.x, (top + H) / 2, SLAM_HALF_W * 2, H - top, 0xffd0c0, 0.7).setDepth(32);
+    const flash = this.add.graphics().setDepth(32);
+    flash.fillStyle(0xffd0c0, 0.7);
+    flash.fillPoints(lane, true);
     this.tweens.add({ targets: flash, alpha: 0, duration: 260, onComplete: () => flash.destroy() });
-    for (let y = top + 80; y < H; y += 160) this.burstRed.explode(8, sl.x, y);
+    for (let y = top + 80; y < VIEW.near; y += 160) this.explode(this.burstRed, 8, sl.x, y);
     this.shake(220, 0.012);
     Sfx.noise(0.4, 0.2, 0, 300, 'lowpass');
 
@@ -812,7 +956,7 @@ class GameScene extends Phaser.Scene {
     this.endBoss(b);
     const lost = Math.ceil(this.s.squad * 0.5) + 3;
     this.addSpeed(-2 * this.hero.hitLoss);
-    this.burstRed.explode(60, this.squadX, LINE_Y - 40);
+    this.explode(this.burstRed, 60, this.squadX, LINE_Y - 40);
     this.popNumber(this.squadX, LINE_Y - 250, '-' + lost, '#e0413a', 56);
     this.shake(500, 0.02);
     this.cameras.main.flash(200, 160, 20, 20);
@@ -829,8 +973,8 @@ class GameScene extends Phaser.Scene {
     this.s.kills++;
     this.s.score += Math.round(1000 * (this.s.wave / TUNING.bossEvery) * Math.ceil(this.effSpeed()));
     this.addSpeed(1.5);
-    this.burstRed.explode(80, b.x, b.y);
-    this.burstGold.explode(60, b.x, b.y);
+    this.explode(this.burstRed, 80, b.x, b.y);
+    this.explode(this.burstGold, 60, b.x, b.y);
     this.shake(400, 0.015);
     this.cameras.main.flash(150, 255, 220, 140);
     Sfx.bossDown();
@@ -857,7 +1001,7 @@ class GameScene extends Phaser.Scene {
 
   spawnGateRow() {
     const picks = Phaser.Utils.Array.Shuffle([this.goodGate(), Math.random() < 0.6 ? this.badGate() : this.goodGate()]);
-    const row = { y: -CARD_H, cards: [], done: false };
+    const row = { y: VIEW.far - CARD_H / 2, cards: [], done: false };
     picks.forEach((p, i) => {
       const x = i === 0 ? W / 2 - CARD_W / 2 - 8 : W / 2 + CARD_W / 2 + 8;
       const c = this.add.container(x, row.y).setDepth(5);
@@ -933,7 +1077,7 @@ class GameScene extends Phaser.Scene {
       this.tweens.add({ targets: c.label, scale: 1, duration: 120 });
       Sfx.gateTick();
     }
-    (g.kind === 'add' ? this.burstBlue : this.burstRed).explode(2, c.x + (Math.random() - 0.5) * 120, c.y + CARD_H / 2 - 10);
+    this.explode(g.kind === 'add' ? this.burstBlue : this.burstRed, 2, c.x + (Math.random() - 0.5) * 120, c.y + CARD_H / 2 - 10);
   }
 
   updateGates(dt) {
@@ -1002,10 +1146,10 @@ class GameScene extends Phaser.Scene {
     if (s.over) return;
     this.popNumber(this.squadX, LINE_Y - 260, msg, good ? '#f2c14e' : '#e0413a', 44);
     if (good) {
-      this.burstGold.explode(30, this.squadX, LINE_Y - 20);
+      this.explode(this.burstGold, 30, this.squadX, LINE_Y - 20);
       Sfx.gateGood();
     } else {
-      this.burstRed.explode(30, this.squadX, LINE_Y - 20);
+      this.explode(this.burstRed, 30, this.squadX, LINE_Y - 20);
       this.shake(150, 0.006);
       Sfx.gateBad();
       vibrate(40);
@@ -1041,7 +1185,13 @@ class GameScene extends Phaser.Scene {
 
   updateSpeedFx(dt, eff) {
     const ratio = clamp((eff - 1) / (TUNING.maxSpeed - 1), 0, 1.5);
-    this.road.tilePositionY -= (140 + eff * 75) * dt;
+    const roadSpeed = 180 + eff * 95;
+    this.roadScroll += roadSpeed * dt;
+    this.drawGround();
+    for (const t of this.trees) {
+      t.y += roadSpeed * dt;
+      if (t.y > VIEW.near + 200) t.y -= VIEW.near - VIEW.far + 400;
+    }
 
     const activeStreaks = Math.floor(4 + ratio * 30);
     const streakSpeed = 900 + eff * 260;
@@ -1052,14 +1202,14 @@ class GameScene extends Phaser.Scene {
       if (!on) continue;
       st.setAlpha(0.06 + ratio * 0.22);
       st.y += streakSpeed * dt;
-      if (st.y > H + 100) this.resetStreak(st, false);
+      if (st.y > VIEW.near + 100) this.resetStreak(st, false);
     }
     for (const e of this.embers) {
       e.y += (80 + eff * 70) * dt;
       e.x += Math.sin(this.elapsed * 2 + e.drift) * 20 * dt;
       e.setAlpha(0.25 + ratio * 0.5);
-      if (e.y > H + 10) {
-        e.y = -10;
+      if (e.y > VIEW.near + 10) {
+        e.y = VIEW.far - 10;
         e.x = Math.random() * W;
       }
     }
@@ -1069,9 +1219,10 @@ class GameScene extends Phaser.Scene {
     const t = this.numbers[this.numberIndex];
     this.numberIndex = (this.numberIndex + 1) % this.numbers.length;
     this.tweens.killTweensOf(t);
-    t.setText(str).setColor(color).setFontSize(size).setStroke('#0a0f0e', Math.max(4, Math.round(size * 0.16))).setPosition(x, y).setAlpha(1).setScale(1.3).setVisible(true);
+    const p = project(x, y);
+    t.setText(str).setColor(color).setFontSize(size).setStroke('#0a0f0e', Math.max(4, Math.round(size * 0.16))).setPosition(p.x, p.y).setAlpha(1).setScale(1.3).setVisible(true);
     this.tweens.add({ targets: t, scale: 1, duration: 120, ease: 'Back.easeOut' });
-    this.tweens.add({ targets: t, y: y - 70, alpha: 0, delay: 250, duration: 500, onComplete: () => t.setVisible(false) });
+    this.tweens.add({ targets: t, y: p.y - 70, alpha: 0, delay: 250, duration: 500, onComplete: () => t.setVisible(false) });
   }
 
   banner(title, color, subtitle) {
@@ -1162,10 +1313,10 @@ class GameScene extends Phaser.Scene {
 
   drawBossBar(hpRatio, reach, hp) {
     const g = this.bossBar;
-    const bx = 100;
-    const by = 230;
-    const bw = W - 200;
-    const bh = 42;
+    const bx = 190;
+    const by = 182;
+    const bw = W - 380;
+    const bh = 30;
     g.clear();
     g.fillStyle(0x0a0f0e, 1);
     g.fillRoundedRect(bx - 5, by - 5, bw + 10, bh + 10, (bh + 10) / 2);

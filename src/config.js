@@ -32,7 +32,7 @@ const TUNING = {
   maxShooters: 8,          // bullets per volley; bigger squads hit harder instead
   boltSpeed: 1300,
   gateEvery: 8.5,          // seconds between gate rows
-  gateFall: 150,           // gate fall speed in px/s
+  gateFall: 190,           // gate fall speed in world units per second
   speedDecay: 0.05,        // fire rate lost per second, so you must keep killing
   bossTime: 14,            // seconds the boss needs to reach the squad
   squadCap: 9999,

@@ -123,6 +123,23 @@ function makeTextures(scene) {
     g.fillCircle(26, 49, 4);
   });
 
+  // Dark pine for the forest along the road; drawn at its base so it can be
+  // placed on the ground and scaled by distance.
+  bake('tree', 120, 200, (g) => {
+    g.fillStyle(0x2b1d14, 1);
+    g.fillRect(52, 160, 16, 40);
+    const layer = (y, w, h, c) => {
+      g.fillStyle(0x060d0a, 1);
+      g.fillTriangle(60 - w / 2 - 4, y + 4, 60 + w / 2 + 4, y + 4, 60, y - h - 6);
+      g.fillStyle(c, 1);
+      g.fillTriangle(60 - w / 2, y, 60 + w / 2, y, 60, y - h);
+    };
+    layer(170, 116, 80, 0x10291c);
+    layer(130, 96, 74, 0x143322);
+    layer(92, 74, 66, 0x183d29);
+    layer(56, 50, 54, 0x1d4731);
+  });
+
   bake('dot', 8, 8, (g) => {
     g.fillStyle(0xffffff, 1);
     g.fillCircle(4, 4, 4);
