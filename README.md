@@ -49,7 +49,7 @@ A portrait, one-thumb horde shooter built for Slapjam AI 2. The jam theme is **S
 
 ## Screens and settings
 
-- **Title:** gradient logo, settings gear (top left), how to play (top right), best run card, captain portraits, big PLAY button.
+- **Home screen (Last War style):** the live 3D road behind everything with your squad marching on it and the airship hovering above. Top left: captain portrait with your best wave as its badge, best fire rate bar, best score and best wave strips. Top right: settings and how to play. Center: logo and a big START button. Bottom: captain tiles; the chosen captain leads the squad on the road.
 - **How to play:** an illustrated guide to steering, fire rate, cards, barrels, champions and the horror. It opens on the first launch.
 - **Settings:** music and sound effect volume, vibration, screen shake, reset best run, and the version number. Reachable from the title and the pause menu.
 - **Opening drop (Last War style):** each run starts with a cursed airship hovering over the road. The knights parachute down to their spot one by one, the airship flies off, and a swipe hint with a sliding hand shows for the first three runs.

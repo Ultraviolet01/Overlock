@@ -225,6 +225,7 @@ const World3D = {
   clear() {
     this.live.forEach((m) => this.release(m));
     this.live.clear();
+    this.show = null;
     this.decalPool.forEach((d) => { d.visible = false; });
   },
 
@@ -583,6 +584,49 @@ const World3D = {
     return m;
   },
 
+  // Keep the 3D canvas exactly under Phaser's canvas.
+  fitCanvas(pc) {
+    const c = this.canvas;
+    if (c.style.width !== pc.style.width || c.style.height !== pc.style.height) {
+      c.style.width = pc.style.width;
+      c.style.height = pc.style.height;
+    }
+    c.style.left = pc.offsetLeft + 'px';
+    c.style.top = pc.offsetTop + 'px';
+  },
+
+  // Home screen backdrop: the squad marching in place on the live 3D road,
+  // road and forest scrolling, the chosen captain at the front.
+  showcase(scene, t, captain) {
+    if (!this.active) return;
+    this.fitCanvas(scene.game.canvas);
+    const n = 9;
+    if (!this.show) this.show = [];
+    const lead = captain === 'tank' ? 'champion' : 'knight';
+    for (let i = 0; i < n; i++) {
+      const kind = i === 0 ? lead : 'knight';
+      let m = this.show[i];
+      if (!m || m.userData.kind !== kind) {
+        if (m) this.release(m);
+        m = this.show[i] = this.acquire(kind);
+      }
+      const f = formation(i, 34);
+      m.position.set(f.x * U, 0, f.y * U + (i === 0 ? 0.25 : 0));
+      const ph = t * 9 + i * 1.7;
+      if (m.userData.walkU) m.userData.walkU.forEach((u) => { u.uPhase.value = ph; u.uAmp.value = 1; });
+      if (m.userData.inner) m.userData.inner.position.y = m.userData.innerY - Math.abs(Math.cos(ph)) * 0.025;
+      m.rotation.set(0.1, 0, Math.sin(ph) * 0.035);
+    }
+    const scroll = t * 160;
+    this.roadTex.offset.y = scroll * U / 5.6;
+    const span = 40;
+    this.trees.forEach((tr, i) => {
+      tr.position.z = ((-32 + (i / 40) * span + scroll * U) % span + span) % span - 32;
+    });
+    this.drawDecals([]);
+    this.renderer.render(this.scene, this.camera);
+  },
+
   sync(g) {
     if (!this.active) return;
     this.frame++;
@@ -593,14 +637,7 @@ const World3D = {
       this.renderer.setSize(W, H, false);
     }
     const t = g.elapsed;
-    const pc = g.game.canvas;
-    const c = this.canvas;
-    if (c.style.width !== pc.style.width || c.style.height !== pc.style.height) {
-      c.style.width = pc.style.width;
-      c.style.height = pc.style.height;
-    }
-    c.style.left = pc.offsetLeft + 'px';
-    c.style.top = pc.offsetTop + 'px';
+    this.fitCanvas(g.game.canvas);
 
     for (let i = 0; i < g.knights.length; i++) {
       const k = g.knights[i];
