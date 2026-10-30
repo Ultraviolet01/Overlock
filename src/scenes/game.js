@@ -747,7 +747,7 @@ class GameScene extends Phaser.Scene {
     const txt = this.add.text(W / 2, y, 'SWIPE LEFT OR RIGHT TO MOVE YOUR KNIGHTS', textStyle(24, '#ffffff')).setOrigin(0.5);
     const hand = this.add.image(W / 2, y + 100, 'hand');
     c.add([g, txt, hand]);
-    this.tweens.add({ targets: hand, x: { from: 270, to: 450 }, duration: 750, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.tweens.add({ targets: hand, x: { from: 270, to: 450 }, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     this.tutorial = { c, t: 0, moved: 0 };
   }
 
