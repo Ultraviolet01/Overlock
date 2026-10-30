@@ -422,6 +422,11 @@ class GameScene extends Phaser.Scene {
     this.scoreStrip = uiStrip(this, sx, py + 24, 'icon_score', 0.8, 28).setDepth(50);
     this.killStrip = uiStrip(this, sx + 190, py + 24, 'skull', 0.85, 28).setDepth(50);
     this.bossStrip = uiStrip(this, sx, py + 74, 'skull', 0.85, 22, '#ff8a7a').setDepth(50);
+    this.bestWave = (Store.get('best', null) || {}).wave || 0;
+    this.bestStrip = uiStrip(this, sx + 340, py + 24, 'skull', 0.85, 26, '#f2c14e').setDepth(50);
+    this.bestStrip.icon.setTint(0xf2c14e);
+    this.bestStrip.set('BEST ' + this.bestWave);
+    if (!this.bestWave) this.bestStrip.setVisible(false);
     this.statusText = this.add.text(px - 2, py + ps + 46, '', textStyle(20, '#4fe0c8', { strokeThickness: 4, lineSpacing: 4 }))
       .setDepth(51);
 
@@ -1607,10 +1612,18 @@ class GameScene extends Phaser.Scene {
     this.s.waveTime = 0;
     this.s.wave++;
     this.s.score += 100 * this.s.wave;
+    const record = this.bestWave > 0 && this.s.wave > this.bestWave;
+    if (record) {
+      this.bestStrip.set('BEST ' + this.s.wave);
+      this.bestStrip.t.setColor('#5fd35a');
+      this.bestStrip.icon.setTint(0x5fd35a);
+    }
+    const firstRecord = record && this.s.wave === this.bestWave + 1;
     if (this.s.wave % TUNING.bossEvery === 0) {
       this.spawnBoss();
+      if (firstRecord) this.popNumber(this.squadX, LINE_Y - 320, 'NEW BEST WAVE', '#5fd35a', 44);
     } else {
-      this.banner('WAVE ' + this.s.wave, '#f2c14e', 'The horde quickens');
+      this.banner('WAVE ' + this.s.wave, '#f2c14e', firstRecord ? 'New best wave!' : 'The horde quickens');
     }
   }
 

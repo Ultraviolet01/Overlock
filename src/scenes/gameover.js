@@ -13,9 +13,16 @@ class GameOverScene extends Phaser.Scene {
     const r = this.result;
     this.add.tileSprite(W / 2, H / 2, W, H, 'road').setTint(0x5f6f6a);
 
-    const prev = Store.get('best', null);
-    const isBest = !prev || r.score > prev.score;
-    if (isBest) Store.set('best', { wave: r.wave, topSpeed: r.topSpeed, score: r.score, maxSquad: r.maxSquad });
+    // Each record is kept on its own; the highest wave is the headline one.
+    const prev = Store.get('best', null) || { wave: 0, topSpeed: 1, score: 0, maxSquad: 0 };
+    const isBest = r.wave > prev.wave;
+    const best = {
+      wave: Math.max(prev.wave || 0, r.wave),
+      topSpeed: Math.max(prev.topSpeed || 1, r.topSpeed),
+      score: Math.max(prev.score || 0, r.score),
+      maxSquad: Math.max(prev.maxSquad || 0, r.maxSquad),
+    };
+    Store.set('best', best);
 
     const panel = uiModal(this, 640, 1060, 'WAVE ' + r.wave);
     panel.y = H / 2 - 20;
@@ -26,10 +33,10 @@ class GameOverScene extends Phaser.Scene {
 
     add(this.add.text(0, -440, 'THE HORDE BROKE THROUGH', textStyle(42, '#ff5a3c', { fontStyle: 'italic' })).setOrigin(0.5));
     if (isBest) {
-      const nb = add(this.add.text(0, -385, 'NEW BEST RUN', textStyle(32, '#f2c14e')).setOrigin(0.5));
+      const nb = add(this.add.text(0, -385, 'NEW BEST WAVE', textStyle(32, '#f2c14e')).setOrigin(0.5));
       this.tweens.add({ targets: nb, scale: 1.12, duration: 420, yoyo: true, repeat: -1 });
     } else {
-      add(this.add.text(0, -385, 'BEST: ' + prev.score.toLocaleString('en-US') + ' PTS, WAVE ' + prev.wave,
+      add(this.add.text(0, -385, 'BEST WAVE ' + best.wave + '  |  BEST SCORE ' + best.score.toLocaleString('en-US'),
         textStyle(24, '#c9d6d2')).setOrigin(0.5));
     }
 
