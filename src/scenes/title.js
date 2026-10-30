@@ -1,6 +1,5 @@
-// Home screen: the live 3D road behind everything with the squad marching
-// on it, the airship hovering above, player stats top-left, settings and
-// help top-right, the logo, and a big START button.
+// Home screen: live 3D road, floating magic particles, animated logo,
+// player stats, and a big START button.
 
 class TitleScene extends Phaser.Scene {
   constructor() {
@@ -29,19 +28,18 @@ class TitleScene extends Phaser.Scene {
     uiIconButton(this, W - 52, 54, 'gear', () => openSettings(this), 72);
     uiIconButton(this, W - 52, 140, 'help', () => openHelp(this), 72);
 
-    // Logo
-    const logo = this.add.text(W / 2, 250, 'OVERCLOCK', textStyle(104, '#ffffff', {
-      fontStyle: 'italic', strokeThickness: 16, shadow: { offsetX: 0, offsetY: 9, color: '#000000', blur: 0, fill: true, stroke: true },
-    })).setOrigin(0.5);
-    const grd = logo.context.createLinearGradient(0, 0, 0, logo.height);
-    grd.addColorStop(0.15, '#ffffff');
-    grd.addColorStop(0.5, '#9fdcff');
-    grd.addColorStop(0.9, '#2f86d6');
-    logo.setFill(grd);
-    this.add.text(W / 2, 330, 'FIRE FASTER OR FALL', textStyle(28, '#f2c14e', { fontStyle: 'italic' })).setOrigin(0.5);
+    this.buildLogo();
+    this.spawnParticles();
 
-    this.startBtn = uiButton(this, W / 2, 640, 380, 118, 'START', BTN_BLUE, () => this.start(), { size: 60 });
+    this.startBtn = uiButton(this, W / 2, 620, 400, 120, 'START', BTN_BLUE, () => this.start(), { size: 64 });
     this.tweens.add({ targets: this.startBtn, scale: 1.05, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+
+    // Selected wizard hint below START
+    const heroName = HEROES[this.selected].name;
+    this.wizardHint = this.add.text(W / 2, 700, 'PLAYING AS ' + heroName, textStyle(22, COLORS.textDim, { strokeThickness: 4 })).setOrigin(0.5);
+
+    // Best run banner (fills the empty bottom area)
+    this.drawBestBanner();
 
     this.add.text(W / 2, H - 22, 'v' + VERSION, textStyle(16, '#9fb3ad', { strokeThickness: 3 })).setOrigin(0.5);
 
@@ -51,8 +49,43 @@ class TitleScene extends Phaser.Scene {
     if (!Store.get('seenHelp', false)) openHelp(this);
   }
 
-  // Top-left: wizard portrait with a level-style badge (best wave),
-  // a fire-rate bar, and slim strips.
+  buildLogo() {
+    // Glow behind the logo
+    this.logoGlow = this.add.graphics();
+    this.logoGlow.fillStyle(0x3d78b8, 0.12);
+    this.logoGlow.fillEllipse(W / 2, 255, 520, 140);
+
+    const logo = this.add.text(W / 2, 250, 'OVERCLOCK', textStyle(104, '#ffffff', {
+      fontStyle: 'italic', strokeThickness: 16, shadow: { offsetX: 0, offsetY: 9, color: '#000000', blur: 0, fill: true, stroke: true },
+    })).setOrigin(0.5);
+    const grd = logo.context.createLinearGradient(0, 0, 0, logo.height);
+    grd.addColorStop(0.15, '#ffffff');
+    grd.addColorStop(0.5, '#9fdcff');
+    grd.addColorStop(0.9, '#2f86d6');
+    logo.setFill(grd);
+    this.logo = logo;
+
+    this.add.text(W / 2, 330, 'FIRE FASTER OR FALL', textStyle(28, '#f2c14e', { fontStyle: 'italic' })).setOrigin(0.5);
+  }
+
+  spawnParticles() {
+    this.motes = [];
+    for (let i = 0; i < 18; i++) {
+      const mote = this.add.image(
+        Math.random() * W,
+        Math.random() * H,
+        'dot'
+      ).setScale(0.5 + Math.random() * 1.2);
+      mote.setTint(pick([0x7b3dff, 0x9f6aff, 0xd4b8ff, 0x4fc3ff]));
+      mote.setAlpha(0.2 + Math.random() * 0.4);
+      mote.vx = (Math.random() - 0.5) * 30;
+      mote.vy = -20 - Math.random() * 40;
+      mote.baseAlpha = mote.alpha;
+      mote.phase = Math.random() * Math.PI * 2;
+      this.motes.push(mote);
+    }
+  }
+
   drawPlayerCluster() {
     const best = Store.get('best', null) || { wave: 0, topSpeed: 1, score: 0 };
     const px = 18;
@@ -86,6 +119,28 @@ class TitleScene extends Phaser.Scene {
     uiStrip(this, sx, py + 74, 'skull', 0.85, 22, '#c9d6d2').set(best.wave ? 'BEST WAVE ' + best.wave : 'NO RUNS YET');
   }
 
+  drawBestBanner() {
+    const best = Store.get('best', null) || { wave: 0, topSpeed: 1, score: 0 };
+    if (best.wave === 0) return;
+
+    const by = 940;
+    const bg = this.add.graphics();
+    bg.fillStyle(0x0a0f0e, 0.65);
+    bg.fillRoundedRect(40, by - 20, W - 80, 56, 12);
+    bg.lineStyle(2, COLORS.gold, 0.25);
+    bg.strokeRoundedRect(40, by - 20, W - 80, 56, 12);
+
+    const cols = [
+      { icon: 'skull', val: 'WAVE ' + best.wave, x: 130 },
+      { icon: 'icon_flame', val: 'x' + best.topSpeed.toFixed(1), x: 330 },
+      { icon: 'icon_score', val: best.score.toLocaleString('en-US'), x: 510 },
+    ];
+    cols.forEach((c) => {
+      this.add.image(c.x - 28, by + 8, c.icon).setScale(0.48);
+      this.add.text(c.x, by + 8, c.val, textStyle(18, COLORS.textDim, { strokeThickness: 3 })).setOrigin(0, 0.5);
+    });
+  }
+
   start() {
     Sfx.resume();
     this.scene.start('Select');
@@ -93,8 +148,30 @@ class TitleScene extends Phaser.Scene {
 
   update(time, delta) {
     this.t += delta / 1000;
+    const dt = delta / 1000;
+
     if (World3D.active) World3D.showcase(this, this.t, this.selected);
     else this.road.tilePositionY -= delta * 0.12;
+
     this.airship.setPosition(W / 2 + Math.sin(this.t * 0.6) * 24, 488 + Math.sin(this.t * 1.8) * 8);
+
+    // Logo glow pulse
+    if (this.logoGlow) {
+      this.logoGlow.clear();
+      const pulse = 0.08 + Math.sin(this.t * 1.5) * 0.04;
+      this.logoGlow.fillStyle(0x3d78b8, pulse);
+      this.logoGlow.fillEllipse(W / 2, 255, 520 + Math.sin(this.t * 2) * 20, 140);
+    }
+
+    // Floating magic motes
+    for (const m of this.motes) {
+      m.x += m.vx * dt;
+      m.y += m.vy * dt;
+      m.phase += dt * 2;
+      m.setAlpha(m.baseAlpha * (0.6 + Math.sin(m.phase) * 0.4));
+      if (m.y < -20) { m.y = H + 10; m.x = Math.random() * W; }
+      if (m.x < -20) m.x = W + 10;
+      if (m.x > W + 20) m.x = -10;
+    }
   }
 }
