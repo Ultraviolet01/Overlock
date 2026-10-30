@@ -665,8 +665,8 @@ class GameScene extends Phaser.Scene {
       if (s.overclock <= 0) this.endOverclock();
     } else if (s.speed >= TUNING.maxSpeed) {
       this.startOverclock();
-    } else if (s.speed > 1) {
-      this.addSpeed(-TUNING.speedDecay * s.speed * dt);
+    } else {
+      this.addSpeed(TUNING.speedClimb * dt);
     }
 
     const eff = this.effSpeed();
@@ -1147,7 +1147,7 @@ class GameScene extends Phaser.Scene {
     if (!rewarded) return;
     this.s.kills++;
     this.s.score += e.def.pts * this.scoreMult();
-    this.addSpeed(e.def.gain * 4);
+    this.addSpeed(e.def.gain * 2);
     const green = e.def.key === 'sprinter' || e.def.key === 'wraith' || e.def.key === 'bloater';
     this.explode(green ? this.burstRot : this.burstRed, e.def.tag ? 26 : 10, e.x, e.y);
     Sfx.kill();
@@ -1559,9 +1559,8 @@ class GameScene extends Phaser.Scene {
 
   goodGate() {
     const w = this.s.wave;
-    const kind = weighted([['add', 32], ['mul', w >= 2 ? 18 : 8], ['speed', 22], ['bolt', 12], ['slow', 10]]);
+    const kind = weighted([['add', 40], ['mul', w >= 2 ? 22 : 10], ['bolt', 18], ['slow', 14]]);
     if (kind === 'add') return { kind, value: Math.round(3 + w * 1.5 + Math.random() * (3 + w)) };
-    if (kind === 'speed') return { kind, value: Math.round(5 + Math.random() * 6) / 10 };
     if (kind === 'mul') return { kind, value: Math.random() < 0.75 ? 2 : 3 };
     return { kind };
   }
@@ -1570,7 +1569,6 @@ class GameScene extends Phaser.Scene {
   // the number up until it crosses zero and turns into a gold gate.
   badGate() {
     const w = this.s.wave;
-    if (Math.random() < 0.3) return { kind: 'speed', value: -Math.round(10 + Math.random() * 10) / 10 };
     return { kind: 'add', value: -Math.round(10 + w * 3 + Math.random() * (15 + w * 4)) };
   }
 
@@ -1590,8 +1588,8 @@ class GameScene extends Phaser.Scene {
       const x = W / 2 + (i === 0 ? -1 : 1) * (CARD_W + GATE_GAP) / 2;
       const c = this.add.container(x, row.y).setDepth(5);
       c.gate = p;
-      // Shooting raises the number on wizard and speed gates.
-      c.shootable = p.kind === 'add' || p.kind === 'speed';
+      // Shooting raises the number on wizard gates.
+      c.shootable = p.kind === 'add';
       c.h3 = 0;
       c.startValue = p.value || 0;
       c.bg = this.add.graphics();
@@ -1612,10 +1610,6 @@ class GameScene extends Phaser.Scene {
         return { text: (v >= 0 ? '+' : '') + v, sub: v > 0 ? 'ADD WIZARDS' : 'LOSE WIZARDS', color: v > 0 ? COLORS.gold : COLORS.bad, icon: 'knight' };
       }
       case 'mul': return { text: 'x' + g.value, sub: 'MULTIPLY WIZARDS', color: COLORS.gold, icon: 'knight' };
-      case 'speed': {
-        const v = Math.round(g.value * 10) / 10;
-        return { text: (v >= 0 ? '+' : '') + v.toFixed(1), sub: v >= 0 ? 'SPEED UP' : 'SLOW DOWN', color: v >= 0 ? COLORS.speedGate : COLORS.bad, icon: 'icon_flame' };
-      }
       case 'bolt': return { text: '+50%', sub: 'SPELL POWER UP', color: COLORS.speedGate, icon: 'bolt' };
       case 'slow': return { text: 'SLOW', sub: 'FREEZE HORDE 5s', color: COLORS.speedGate, icon: 'skull' };
     }
@@ -1652,10 +1646,6 @@ class GameScene extends Phaser.Scene {
       const step = start < 0 ? 0.34 + -start * 0.012 : 0.34;
       const cap = start < 0 ? -start * 0.5 + 5 + this.s.wave * 2 : start + 30 + this.s.wave * 3;
       g.value = Math.min(cap, g.value + step);
-    } else if (g.kind === 'speed') {
-      const start = c.startValue;
-      const step = start < 0 ? 0.012 + -start * 0.012 : 0.01;
-      g.value = Math.min(start < 0 ? 1 : start + 1.5, g.value + step);
     }
     const info = this.cardInfo(g);
     if (info.text !== c.shownText) {
@@ -1712,13 +1702,6 @@ class GameScene extends Phaser.Scene {
         msg = 'x' + g.value;
         this.setSquad(s.squad * g.value);
         break;
-      case 'speed': {
-        const v = Math.round(g.value * 10) / 10;
-        good = v >= 0;
-        msg = (v >= 0 ? 'SPEED +' : 'SPEED ') + v.toFixed(1);
-        this.addSpeed(v);
-        break;
-      }
       case 'bolt':
         msg = 'SPELL POWER +50%';
         s.boltMult = Math.min(2.5, s.boltMult * 1.5);

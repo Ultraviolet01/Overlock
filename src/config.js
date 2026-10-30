@@ -33,7 +33,7 @@ const TUNING = {
   boltSpeed: 1300,
   gateEvery: 8.5,          // seconds between gate rows
   gateFall: 120,           // gate fall speed in world units per second
-  speedDecay: 0.09,        // share of current speed lost per second, so you must keep killing
+  speedClimb: 0.035,       // speed gained per second just by running; x1 to x5 in about two minutes
   overclockTime: 5,        // seconds of OVERCLOCK at max speed
   bossTime: 14,            // seconds the boss needs to reach the squad
   squadCap: 9999,

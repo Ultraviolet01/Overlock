@@ -6,15 +6,15 @@ A portrait, one-thumb horde shooter built for Slapjam AI 2. The jam theme is **S
 
 - Drag left or right to steer your squad of wizards. They cast spells on their own.
 - Speed is everything. The meter at the bottom runs from x1.0 to x5.0, and the faster you go, the faster your spells fly.
-- Speed drains fast. Every kill, gate and barrel pushes it back up; every bite knocks it down.
+- The run gets faster on its own as you go, about x1 to x5 in two minutes. Kills nudge it up; every bite knocks it down.
 - Your speed multiplies every point of score (shown as `SCORE x3` next to the meter).
 - Hit x5 to trigger OVERCLOCK: 5 seconds of piercing spells, a glowing squad and a wider, faster view.
 - Enemies that reach your squad latch on and keep biting until you shoot them down. A boss that reaches you keeps smashing.
 - Gates come toward you in pairs. Walk through one to take its effect:
   - Gold gates add or multiply wizards: `+8`, `x2`, `x3`.
-  - Cyan gates speed you up (`+0.8`), boost spell power, or slow the horde.
-  - Red gates take wizards (`-30`) or slow you down (`-1.5`).
-- Shoot the wizard and speed gates to raise their number. A red `-30` or `-1.5` climbs toward zero, flips color, and then helps you.
+  - Cyan gates boost spell power or slow the horde.
+  - Red gates take wizards (`-30`).
+- Shoot the wizard gates to raise their number. A red `-30` climbs toward zero, turns gold, and then gives wizards.
 - Every 10 wizards merge into one archmage, so a squad of hundreds stays readable.
 - Rune barrels roll down a lane. Shoot one open for piercing bolts, extra spell damage or more wizards. If you don't break it and it reaches your squad, it crashes into it.
 - The horde speeds up every 15 seconds and new enemy types join as the waves climb. The first time one appears, its name and a tip show on screen.
