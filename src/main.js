@@ -24,7 +24,7 @@ function startGame() {
     render: {
       antialias: true,
     },
-    scene: [BootScene, TitleScene, GameScene, GameOverScene],
+    scene: [BootScene, TitleScene, SelectScene, GameScene, GameOverScene],
   });
 }
 

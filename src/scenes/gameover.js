@@ -75,7 +75,7 @@ class GameOverScene extends Phaser.Scene {
 
     const again = () => this.scene.start('Game', { hero: r.hero });
     add(uiButton(this, 0, 320, 460, 112, 'RUN AGAIN', 0x5fd35a, again, { size: 50 }));
-    add(uiButton(this, 0, 450, 460, 88, 'CHANGE WIZARD', BTN_BLUE, () => this.scene.start('Title'), { size: 30 }));
+    add(uiButton(this, 0, 450, 460, 88, 'CHANGE WIZARD', BTN_BLUE, () => this.scene.start('Select'), { size: 30 }));
 
     this.input.keyboard.once('keydown-SPACE', again);
     this.input.keyboard.once('keydown-ENTER', again);
