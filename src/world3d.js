@@ -39,6 +39,9 @@ const GAIT = {
 // AI-generated textured models; every other kind is built from shapes below.
 const GLB_MODELS = ['knight', 'walker', 'sprinter', 'brute', 'boss', 'colossus', 'brood', 'wraithking'];
 
+// Enemies that have Higgsfield PNGs but no GLB; rendered as billboards.
+const BILLBOARD_MODELS = ['wraith', 'bloater', 'shield', 'summoner', 'splitter'];
+
 const World3D = {
   active: false,
   ready: false,
@@ -100,7 +103,17 @@ const World3D = {
         if (name === 'wraithking') this.templates[name].userData.float = 0.3;
         done();
       }, undefined, () => done());
-    }))).then(() => { this.ready = true; });
+    }))).then(() => {
+      const texLoader = new THREE.TextureLoader();
+      return Promise.all(BILLBOARD_MODELS.map((name) => new Promise((done) => {
+        texLoader.load('./assets/' + name + '.png', (tex) => {
+          tex.encoding = THREE.sRGBEncoding;
+          this.billboards = this.billboards || {};
+          this.billboards[name] = tex;
+          done();
+        }, undefined, () => done());
+      })));
+    }).then(() => { this.ready = true; });
   },
 
   // Matte material, computed normals (the generated files have none), feet
@@ -287,6 +300,24 @@ const World3D = {
     this.pools[m.userData.kind].push(m);
   },
 
+  buildBillboard(kind) {
+    const texKind = kind === 'slimelet' ? 'splitter' : kind;
+    const tex = this.billboards[texKind];
+    const h = MODEL_SIZE[kind] || 1.3;
+    const aspect = tex.image ? tex.image.width / tex.image.height : 0.7;
+    const w = h * aspect;
+    const geo = new THREE.PlaneGeometry(w, h);
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.1, side: THREE.DoubleSide });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.y = h / 2;
+    const g = new THREE.Group();
+    g.add(mesh);
+    g.userData.inner = mesh;
+    g.userData.billboard = true;
+    if (kind === 'wraith') g.userData.float = 0.25;
+    return g;
+  },
+
   build(kind) {
     if (kind === 'champion' && this.templates.knight) return this.buildChampion();
     if (this.templates[kind]) {
@@ -295,9 +326,10 @@ const World3D = {
       g.userData.gait = GAIT[kind];
       return g;
     }
+    const bbKind = kind === 'slimelet' ? 'splitter' : kind;
+    if (this.billboards && this.billboards[bbKind]) return this.buildBillboard(kind);
     const f = this['build_' + kind] || this.build_walker;
     const g = f.call(this);
-    // Hand-built models are made at a base height; scale them to MODEL_SIZE.
     const base = HAND_BASE[kind] || HAND_BASE.walker;
     g.scale.multiplyScalar((MODEL_SIZE[kind] || base) / base);
     return g;
@@ -577,13 +609,18 @@ const World3D = {
       if (m.userData.spiderLegs) m.userData.spiderLegs.forEach((l, i) => { l.rotation.x = Math.sin(ph * 1.5 + i) * 0.3; });
       if (m.userData.squish) m.scale.y = m.userData.baseScaleY * (1 + Math.sin(ph * 2) * 0.08);
     }
+    if (m.userData.billboard && m.userData.inner) {
+      m.userData.inner.lookAt(this.camera.position);
+    }
     m.userData.shadow.position.y = -lift + 0.03;
-    // Hit flash.
     const flash = o.hitFlash > 0 || (o.isBoss && o.immune);
     if (flash !== m.userData.flashing) {
       m.userData.flashing = flash;
       const c = o.immune ? 0x2f7fb0 : 0xffffff;
-      m.userData.mats.forEach((mt) => { if (mt.emissive) mt.emissive.setHex(flash ? c : (mt.userData.baseEmissive || 0)); });
+      m.userData.mats.forEach((mt) => {
+        if (mt.emissive) mt.emissive.setHex(flash ? c : (mt.userData.baseEmissive || 0));
+        else if (m.userData.billboard) mt.color.setHex(flash ? 0xff9090 : 0xffffff);
+      });
     }
     return m;
   },
