@@ -118,6 +118,7 @@ python3 -m http.server 8000
 ## AI use (for the jam disclosure)
 
 - Code: written with Claude Code.
-- Character art: generated with Higgsfield (Z Image).
-- 3D models: generated with Higgsfield (SAM 3D) from that art.
+- Character, enemy, portrait and prop art: generated with Higgsfield (Z Image, Nano Banana Pro, Seedream).
+- 3D models (wizards, enemies, bosses, rune barrel): generated with Higgsfield (SAM 3D) from that art.
+- itch.io cover and screenshots: captured from the game and laid out in code written with Claude Code.
 - Sound and music: synthesized in code written with Claude Code.
