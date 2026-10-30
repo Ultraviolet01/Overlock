@@ -761,12 +761,24 @@ const World3D = {
     const w = 2.3;
     const h = 1.7;
     const g = new THREE.Group();
-    const glassMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false });
+    const glow = { transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending };
+    const tx = this.gateTextures || (this.gateTextures = this.makeGateTextures());
+    // Halo behind the panel, the glowing energy field, and a pool of light on the road.
+    const haloMat = new THREE.MeshBasicMaterial(Object.assign({ map: tx.halo }, glow));
+    const halo = new THREE.Mesh(new THREE.PlaneGeometry(w + 1.1, h + 1.1), haloMat);
+    halo.position.set(0, h / 2, -0.02);
+    g.add(halo);
+    const glassMat = new THREE.MeshBasicMaterial(Object.assign({ map: tx.field }, glow));
     const glass = new THREE.Mesh(new THREE.PlaneGeometry(w, h), glassMat);
     glass.position.y = h / 2;
     g.add(glass);
+    const poolMat = new THREE.MeshBasicMaterial(Object.assign({ map: tx.pool }, glow));
+    const pool = new THREE.Mesh(new THREE.PlaneGeometry(w + 1.2, 1.6), poolMat);
+    pool.rotation.x = -Math.PI / 2;
+    pool.position.y = 0.03;
+    g.add(pool);
     const frameMat = new THREE.MeshLambertMaterial({ color: 0x2b2f36, transparent: true });
-    const trimMat = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true });
+    const trimMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true });
     [-1, 1].forEach((sd) => {
       const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, h + 0.25, 0.16), frameMat);
       post.position.set(sd * w / 2, (h + 0.25) / 2, 0);
@@ -788,9 +800,57 @@ const World3D = {
     sign.position.y = h * 0.55;
     sign.renderOrder = 2;
     g.add(sign);
-    g.userData = { glassMat, frameMat, trimMat, signMat, sign, cv, tex, shown: null };
+    // Neon strips running up the inside of each post.
+    [-1, 1].forEach((sd) => {
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(0.06, h, 0.18), trimMat);
+      strip.position.set(sd * (w / 2 - 0.09), h / 2, 0);
+      g.add(strip);
+    });
+    g.userData = { glassMat, haloMat, poolMat, frameMat, trimMat, signMat, sign, cv, tex, shown: null };
     this.scene.add(g);
     return g;
+  },
+
+  // White glow shapes, tinted per gate by the material color.
+  makeGateTextures() {
+    const canvas = (w, h, draw) => {
+      const cv = document.createElement('canvas');
+      cv.width = w;
+      cv.height = h;
+      draw(cv.getContext('2d'), w, h);
+      return new THREE.CanvasTexture(cv);
+    };
+    const field = canvas(128, 128, (x, w, h) => {
+      const v = x.createLinearGradient(0, 0, 0, h);
+      v.addColorStop(0, 'rgba(255,255,255,0.18)');
+      v.addColorStop(1, 'rgba(255,255,255,0.7)');
+      x.fillStyle = v;
+      x.fillRect(0, 0, w, h);
+      x.globalCompositeOperation = 'lighter';
+      [[0, 0, 22, 0], [w, 0, w - 22, 0]].forEach(([x0, y0, x1, y1]) => {
+        const e = x.createLinearGradient(x0, y0, x1, y1);
+        e.addColorStop(0, 'rgba(255,255,255,0.6)');
+        e.addColorStop(1, 'rgba(255,255,255,0)');
+        x.fillStyle = e;
+        x.fillRect(0, 0, w, h);
+      });
+    });
+    const halo = canvas(128, 128, (x, w, h) => {
+      x.shadowColor = '#ffffff';
+      x.shadowBlur = 22;
+      x.strokeStyle = 'rgba(255,255,255,0.9)';
+      x.lineWidth = 10;
+      x.strokeRect(26, 26, w - 52, h - 52);
+    });
+    const pool = canvas(128, 64, (x, w, h) => {
+      const r = x.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+      r.addColorStop(0, 'rgba(255,255,255,0.75)');
+      r.addColorStop(1, 'rgba(255,255,255,0)');
+      x.setTransform(1, 0, 0, 0.5, 0, h / 4);
+      x.fillStyle = r;
+      x.fillRect(0, 0, w, w);
+    });
+    return { field, halo, pool };
   },
 
   drawGateSign(m, info) {
@@ -814,6 +874,8 @@ const World3D = {
     x.fillText(info.sub, 256, 212);
     u.tex.needsUpdate = true;
     u.glassMat.color.setHex(info.color);
+    u.haloMat.color.setHex(info.color);
+    u.poolMat.color.setHex(info.color);
     u.trimMat.color.setHex(info.color);
   },
 
@@ -851,7 +913,10 @@ const World3D = {
       m.scale.setScalar(c.scaleX);
       const a = c.alpha;
       const u = m.userData;
-      u.glassMat.opacity = 0.35 * a;
+      const pulse = 0.85 + 0.15 * Math.sin(g.elapsed * 5 + c.x);
+      u.glassMat.opacity = 0.75 * a * pulse;
+      u.haloMat.opacity = a * pulse;
+      u.poolMat.opacity = 0.8 * a * pulse;
       u.signMat.opacity = a;
       u.frameMat.opacity = a;
       u.trimMat.opacity = a;
