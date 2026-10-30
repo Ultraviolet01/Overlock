@@ -58,8 +58,8 @@ const MERGE_SIZE = 10;         // this many knights merge into one champion
 const MAX_UNITS = 40;          // sprites drawn for the squad
 const MAX_CHAMPIONS = 30;
 const SQUAD_MIN_X = 110;
-const CARD_W = 268;
-const CARD_H = 140;
+const CARD_W = 340;
+const CARD_H = 180;
 const SLAM_HALF_W = 95;
 const MAX_SQUAD_RADIUS = 120; // keeps a big crowd narrow enough to dodge
 
@@ -1421,7 +1421,7 @@ class GameScene extends Phaser.Scene {
     const picks = Phaser.Utils.Array.Shuffle([this.goodGate(), Math.random() < 0.6 ? this.badGate() : this.goodGate()]);
     const row = { y: VIEW.far - CARD_H / 2, cards: [], done: false };
     picks.forEach((p, i) => {
-      const x = i === 0 ? W / 2 - CARD_W / 2 - 8 : W / 2 + CARD_W / 2 + 8;
+      const x = i === 0 ? W / 2 - CARD_W / 2 - 4 : W / 2 + CARD_W / 2 + 4;
       const c = this.add.container(x, row.y).setDepth(5);
       c.gate = p;
       // Shooting raises +/- cards, and makes the red divide and trap cards worse.
@@ -1429,8 +1429,8 @@ class GameScene extends Phaser.Scene {
       c.h3 = 0;
       c.startValue = p.value || 0;
       c.bg = this.add.graphics();
-      c.label = this.add.text(0, -12, '', textStyle(68, '#ffffff', { fontStyle: 'italic' })).setOrigin(0.5);
-      c.sub = this.add.text(0, 52, '', textStyle(18, '#ffffff', { strokeThickness: 4 })).setOrigin(0.5);
+      c.label = this.add.text(0, -16, '', textStyle(72, '#ffffff', { fontStyle: 'italic' })).setOrigin(0.5);
+      c.sub = this.add.text(0, 54, '', textStyle(22, '#ffffff', { strokeThickness: 4 })).setOrigin(0.5);
       c.add([c.bg, c.label, c.sub]);
       this.drawCard(c);
       row.cards.push(c);
@@ -1454,24 +1454,20 @@ class GameScene extends Phaser.Scene {
     return { text: '?', sub: '', color: COLORS.gold };
   }
 
-  // Glassy see-through gate panel, tinted gold (good), red (bad) or teal
-  // (speed), with a big white slanted number, like Last War's gates.
   drawCard(c) {
     const info = this.cardInfo(c.gate);
     const g = c.bg;
     const hw = CARD_W / 2;
     const hh = CARD_H / 2;
     g.clear();
-    g.fillStyle(0x0a0f0e, 0.9);
-    g.fillRoundedRect(-hw - 4, -hh - 4, CARD_W + 8, CARD_H + 8, 16);
-    g.fillStyle(info.color, 0.72);
-    g.fillRoundedRect(-hw, -hh, CARD_W, CARD_H, 12);
-    g.fillStyle(darken(info.color, 35), 0.55);
-    g.fillRoundedRect(-hw, hh - 30, CARD_W, 30, { tl: 0, tr: 0, bl: 12, br: 12 });
-    g.fillStyle(0xffffff, 0.22);
-    g.fillRoundedRect(-hw + 8, -hh + 7, CARD_W - 16, CARD_H * 0.32, 10);
-    g.lineStyle(4, 0xffffff, 0.8);
-    g.strokeRoundedRect(-hw, -hh, CARD_W, CARD_H, 12);
+    g.fillStyle(info.color, 0.38);
+    g.fillRoundedRect(-hw, -hh, CARD_W, CARD_H, 14);
+    g.fillStyle(info.color, 0.18);
+    g.fillRoundedRect(-hw, -hh, CARD_W, CARD_H, 14);
+    g.lineStyle(3, 0xffffff, 0.5);
+    g.strokeRoundedRect(-hw, -hh, CARD_W, CARD_H, 14);
+    g.fillStyle(0xffffff, 0.12);
+    g.fillRoundedRect(-hw + 6, -hh + 5, CARD_W - 12, CARD_H * 0.35, 10);
     c.label.setText(info.text);
     c.sub.setText(info.sub);
     c.shownText = info.text;
