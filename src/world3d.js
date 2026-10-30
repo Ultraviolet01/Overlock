@@ -27,6 +27,7 @@ const HAND_BASE = {
 // alternate too. Values are fractions of the model's height or half-width.
 const GAIT = {
   knight: { hip: 0.42, stride: 0.2, arms: [0.5, 0.78], armX: 0.62 },
+  champion: { hip: 0.42, stride: 0.16, arms: [0.5, 0.78], armX: 0.62 },
   walker: { hip: 0.45, stride: 0.22, arms: [0.5, 0.8], armX: 0.55 },
   brute: { hip: 0.4, stride: 0.18, arms: [0.35, 0.75], armX: 0.6 },
   boss: { hip: 0.42, stride: 0.12, arms: [0.3, 0.7], armX: 0.6 },
@@ -37,7 +38,7 @@ const GAIT = {
 };
 
 // AI-generated textured models; every other kind is built from shapes below.
-const GLB_MODELS = ['knight', 'walker', 'sprinter', 'brute', 'boss', 'colossus', 'brood', 'wraithking', 'barrel'];
+const GLB_MODELS = ['knight', 'champion', 'walker', 'sprinter', 'brute', 'boss', 'colossus', 'brood', 'wraithking', 'barrel'];
 
 // Enemies that have Higgsfield PNGs but no GLB; rendered as billboards.
 const BILLBOARD_MODELS = ['wraith', 'bloater', 'shield', 'summoner', 'splitter'];
@@ -320,7 +321,7 @@ const World3D = {
   },
 
   build(kind) {
-    if (kind === 'champion' && this.templates.knight) return this.buildChampion();
+    if (kind === 'champion' && !this.templates.champion && this.templates.knight) return this.buildChampion();
     if (kind === 'barrel' && this.templates.barrel) return this.buildRollingBarrel();
     if (this.templates[kind]) {
       const g = this.templates[kind].clone(true);
