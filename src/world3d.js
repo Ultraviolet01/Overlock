@@ -20,6 +20,19 @@ const HAND_BASE = {
   colossus: 3.3, brood: 2.6, wraithking: 3.4, barrel: 0.75,
 };
 
+// Walk cycle for the AI models, which are single solid meshes with no
+// skeleton: the vertex shader swings everything below the hips forward and
+// back (left and right in opposite phase, feet lifting on the forward swing)
+// and swings the arms the other way. quad: four-legged, front and back legs
+// alternate too. Values are fractions of the model's height or half-width.
+const GAIT = {
+  knight: { hip: 0.42, stride: 0.2, arms: [0.5, 0.78], armX: 0.62 },
+  walker: { hip: 0.45, stride: 0.22, arms: [0.5, 0.8], armX: 0.55 },
+  brute: { hip: 0.4, stride: 0.18, arms: [0.35, 0.75], armX: 0.6 },
+  boss: { hip: 0.42, stride: 0.12, arms: [0.3, 0.7], armX: 0.6 },
+  sprinter: { hip: 0.75, stride: 0.22, quad: true, arms: [2, 2], armX: 1 },
+};
+
 // AI-generated textured models; every other kind is built from shapes below.
 const GLB_MODELS = ['knight', 'walker', 'sprinter', 'brute', 'boss'];
 
@@ -97,6 +110,15 @@ const World3D = {
     });
     const box = new THREE.Box3().setFromObject(root);
     const size = box.getSize(new THREE.Vector3());
+    // Gait geometry in the mesh's own coordinates, for the walk shader.
+    root.updateMatrixWorld(true);
+    let geo = null;
+    root.traverse((o) => { if (o.isMesh && !geo) geo = o.geometry; });
+    if (geo) {
+      geo.computeBoundingBox();
+      const b = geo.boundingBox;
+      root.userData.gaitBox = { minY: b.min.y, maxY: b.max.y, cx: (b.min.x + b.max.x) / 2, cz: (b.min.z + b.max.z) / 2, halfW: (b.max.x - b.min.x) / 2 };
+    }
     const k = height / size.y;
     root.scale.setScalar(k);
     root.position.set(-(box.min.x + size.x / 2) * k, -box.min.y * k, -(box.min.z + size.z / 2) * k);
@@ -239,6 +261,10 @@ const World3D = {
           m.userData.mats.push(o.material);
         }
       });
+      if (m.userData.gait && m.userData.inner) {
+        const box = m.userData.inner.userData.gaitBox || this.templates.knight.children[0].userData.gaitBox;
+        m.userData.walkU = m.userData.mats.map((mt) => this.walkShader(mt, m.userData.gait, box));
+      }
       m.userData.innerY = m.userData.inner ? m.userData.inner.position.y : 0;
       m.userData.baseScaleY = m.scale.y;
       this.scene.add(m);
@@ -261,6 +287,7 @@ const World3D = {
     if (this.templates[kind]) {
       const g = this.templates[kind].clone(true);
       g.userData.inner = g.children[0];
+      g.userData.gait = GAIT[kind];
       return g;
     }
     const f = this['build_' + kind] || this.build_walker;
@@ -269,6 +296,44 @@ const World3D = {
     const base = HAND_BASE[kind] || HAND_BASE.walker;
     g.scale.multiplyScalar((MODEL_SIZE[kind] || base) / base);
     return g;
+  },
+
+  walkShader(mat, gait, b) {
+    const h = b.maxY - b.minY;
+    const u = {
+      uPhase: { value: 0 },
+      uAmp: { value: 0 },
+      uMinY: { value: b.minY },
+      uHip: { value: b.minY + gait.hip * h },
+      uStride: { value: gait.stride * h },
+      uCx: { value: b.cx },
+      uCz: { value: b.cz },
+      uQuad: { value: gait.quad ? 1 : 0 },
+      uArmLo: { value: b.minY + gait.arms[0] * h },
+      uArmHi: { value: b.minY + gait.arms[1] * h },
+      uArmX: { value: gait.armX * b.halfW },
+    };
+    mat.onBeforeCompile = (sh) => {
+      Object.assign(sh.uniforms, u);
+      sh.vertexShader = 'uniform float uPhase, uAmp, uMinY, uHip, uStride, uCx, uCz, uQuad, uArmLo, uArmHi, uArmX;\n' +
+        sh.vertexShader.replace('#include <begin_vertex>', [
+          '#include <begin_vertex>',
+          'float side = position.x > uCx ? 1.0 : -1.0;',
+          'if (uQuad > 0.5) side *= position.z > uCz ? 1.0 : -1.0;',
+          'float swing = sin(uPhase) * side;',
+          'if (position.y < uHip) {',
+          '  float k = clamp((uHip - position.y) / max(uHip - uMinY, 0.0001), 0.0, 1.0);',
+          '  transformed.z += swing * k * uStride * uAmp;',
+          '  transformed.y += max(0.0, swing) * k * uStride * 0.45 * uAmp;',
+          '}',
+          'if (position.y > uArmLo && position.y < uArmHi && abs(position.x - uCx) > uArmX) {',
+          '  float a = (position.y - uArmLo) / max(uArmHi - uArmLo, 0.0001);',
+          '  transformed.z -= swing * (1.0 - a) * uStride * 0.7 * uAmp;',
+          '}',
+        ].join('\n'));
+    };
+    mat.customProgramCacheKey = () => 'walk';
+    return u;
   },
 
   mat(color, emissive) {
@@ -296,6 +361,7 @@ const World3D = {
   buildChampion() {
     const g = this.templates.knight.clone(true);
     g.userData.inner = g.children[0];
+    g.userData.gait = GAIT.knight;
     g.scale.setScalar(MODEL_SIZE.champion / MODEL_SIZE.knight);
     // Gold-lit armor and blue soul flames on the shoulders mark a champion.
     g.traverse((o) => { if (o.isMesh) o.material = o.material.clone(); });
@@ -494,10 +560,14 @@ const World3D = {
     // Walk cycle: a step bob and a waddle, legs swing when the model has them.
     const ph = t * (6 + speed / 35) + (o.wobble || o.phase || 0);
     if (speed > 0) {
-      const bob = Math.abs(Math.sin(ph)) * 0.07;
-      if (m.userData.inner) m.userData.inner.position.y = m.userData.innerY + bob;
-      m.rotation.z = Math.sin(ph) * 0.07;
-      m.rotation.x = 0.08;
+      if (m.userData.walkU) {
+        m.userData.walkU.forEach((u) => { u.uPhase.value = ph; u.uAmp.value = 1; });
+        m.userData.inner.position.y = m.userData.innerY - Math.abs(Math.cos(ph)) * 0.025;
+      } else if (m.userData.inner) {
+        m.userData.inner.position.y = m.userData.innerY + Math.abs(Math.sin(ph)) * 0.03;
+      }
+      m.rotation.z = Math.sin(ph) * 0.035;
+      m.rotation.x = 0.1;
       if (m.userData.legs) m.userData.legs.forEach((l, i) => { l.rotation.x = Math.sin(ph + i * Math.PI) * 0.6; });
       if (m.userData.spiderLegs) m.userData.spiderLegs.forEach((l, i) => { l.rotation.x = Math.sin(ph * 1.5 + i) * 0.3; });
       if (m.userData.squish) m.scale.y = m.userData.baseScaleY * (1 + Math.sin(ph * 2) * 0.08);
@@ -534,7 +604,8 @@ const World3D = {
 
     for (let i = 0; i < g.knights.length; i++) {
       const k = g.knights[i];
-      if (k.visible) this.place(k, k.isChampion ? 'champion' : 'knight', t, 120);
+      // Knights march faster as fire rate rises; no steps while parachuting.
+      if (k.visible) this.place(k, k.isChampion ? 'champion' : 'knight', t, k.lift ? 0 : 140 + g.effSpeed() * 25);
     }
     g.enemies.getChildren().forEach((e) => {
       if (e.active) this.place(e, e.def === ENEMIES.slimelet ? 'slimelet' : e.def.key, t, e.def.speed);
