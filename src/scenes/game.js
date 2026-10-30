@@ -895,8 +895,8 @@ class GameScene extends Phaser.Scene {
 
   // A smaller announcement than a banner, for new enemy types.
   notice(title, sub) {
-    const t = this.add.text(W / 2, 400, title, textStyle(44, '#ff8a7a', { fontStyle: 'italic' })).setOrigin(0.5).setDepth(58).setAlpha(0);
-    const t2 = this.add.text(W / 2, 450, sub, textStyle(24, '#ffffff')).setOrigin(0.5).setDepth(58).setAlpha(0);
+    const t = this.add.text(W / 2, 360, title, textStyle(44, '#ff8a7a', { fontStyle: 'italic' })).setOrigin(0.5).setDepth(58).setAlpha(0);
+    const t2 = this.add.text(W / 2, 408, sub, textStyle(24, '#ffffff')).setOrigin(0.5).setDepth(58).setAlpha(0);
     this.tweens.add({ targets: [t, t2], alpha: 1, duration: 200 });
     this.tweens.add({ targets: [t, t2], alpha: 0, delay: 2000, duration: 400, onComplete: () => { t.destroy(); t2.destroy(); } });
   }
@@ -1132,7 +1132,10 @@ class GameScene extends Phaser.Scene {
     b.setDepth(11).clearTint();
     b.isBoss = true;
     b.isBarrel = false;
-    b.maxHp = 900 * Math.pow(this.s.wave / TUNING.bossEvery, 1.6);
+    // At least the wave's base health, and at least about 8 seconds of the
+    // squad's current firepower, so a huge squad still gets a real fight.
+    const dps = this.s.squad * this.hero.damage * this.s.dmgMult * this.effSpeed() / this.hero.interval;
+    b.maxHp = Math.max(900 * Math.pow(this.s.wave / TUNING.bossEvery, 1.6), dps * 8);
     b.hp = b.maxHp;
     b.dmgAcc = 0;
     b.lastNum = 0;
