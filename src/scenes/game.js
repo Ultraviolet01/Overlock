@@ -1426,7 +1426,7 @@ class GameScene extends Phaser.Scene {
       c.gate = p;
       // Shooting raises +/- cards, and makes the red divide and trap cards worse.
       c.shootable = p.kind === 'add' || p.kind === 'div' || p.kind === 'trap';
-      c.h3 = 75;
+      c.h3 = 0;
       c.startValue = p.value || 0;
       c.bg = this.add.graphics();
       c.label = this.add.text(0, -12, '', textStyle(68, '#ffffff', { fontStyle: 'italic' })).setOrigin(0.5);
