@@ -532,6 +532,13 @@ class GameScene extends Phaser.Scene {
     return 1 + (eff - 1) * 2.25;
   }
 
+  // More wizards hit harder, but with diminishing returns, so a huge squad
+  // from multiply gates cannot steamroll the horde.
+  squadPower() {
+    const n = this.s.squad;
+    return n <= 5 ? n : 5 * Math.pow(n / 5, TUNING.powerCurve);
+  }
+
   // Every point of score is multiplied by the current speed.
   scoreMult() {
     return Math.max(1, Math.floor(this.effSpeed() + 0.001));
@@ -539,7 +546,7 @@ class GameScene extends Phaser.Scene {
 
   waveScale() {
     const w = this.s.wave - 1;
-    return 1 + w * 0.35 + w * w * 0.02;
+    return 1 + w * 0.5 + w * w * 0.13;
   }
 
   hordeMult() {
@@ -879,7 +886,7 @@ class GameScene extends Phaser.Scene {
     const shown = this.units;
     if (shown <= 0) return;
     const shooters = Math.min(this.s.squad, TUNING.maxShooters);
-    const dmg = this.hero.damage * this.s.dmgMult * this.s.squad / shooters;
+    const dmg = this.hero.damage * this.s.dmgMult * this.squadPower() / shooters;
     const vy = TUNING.boltSpeed * this.s.boltMult * (this.s.surgeTimer > 0 ? 1.5 : 1);
     for (let j = 0; j < shooters; j++) {
       const kn = this.knights[Math.floor(Math.random() * shown)];
@@ -1036,11 +1043,14 @@ class GameScene extends Phaser.Scene {
     }));
     const x = 130 + Math.random() * (W - 260);
     if (type === 'walker') {
-      const n = 1 + Math.floor(Math.random() * Math.min(4, 1 + w * 0.5));
+      const n = 1 + Math.floor(Math.random() * Math.min(5, 1 + w * 0.5));
       for (let i = 0; i < n; i++) this.spawnEnemy('walker', clamp(x + (i - (n - 1) / 2) * 46, 110, W - 110));
     } else {
       this.spawnEnemy(type, x);
     }
+    // Later waves send extra enemies alongside each spawn.
+    const extra = Math.floor(w / TUNING.extraEvery);
+    for (let i = 0; i < extra; i++) this.spawnEnemy(w >= 3 && Math.random() < 0.4 ? 'sprinter' : 'walker', 130 + Math.random() * (W - 260));
   }
 
   updateEnemies(dt) {
@@ -1125,7 +1135,8 @@ class GameScene extends Phaser.Scene {
   }
 
   bite(e) {
-    const lost = e.def.bite * Math.ceil(this.s.wave / 3);
+    // Big squads lose a share of themselves, so size alone is no shield.
+    const lost = Math.max(e.def.bite * Math.ceil(this.s.wave / 3), Math.ceil(this.s.squad * TUNING.biteShare * e.def.bite));
     this.addSpeed(-0.3 * e.def.bite * this.hero.hitLoss);
     this.explode(this.burstRed, 14, e.x, LINE_Y - 10);
     this.popNumber(this.squadX, LINE_Y - 230, '-' + lost, '#e0413a', 40);
@@ -1321,7 +1332,7 @@ class GameScene extends Phaser.Scene {
     b.smashT = undefined;
     // At least the wave's base health, and at least about 8 seconds of the
     // squad's current firepower, so a huge squad still gets a real fight.
-    const dps = this.s.squad * this.hero.damage * this.s.dmgMult * this.fireMult(this.effSpeed()) / this.hero.interval;
+    const dps = this.squadPower() * this.hero.damage * this.s.dmgMult * this.fireMult(this.effSpeed()) / this.hero.interval;
     b.maxHp = Math.max(900 * Math.pow(this.s.wave / TUNING.bossEvery, 1.6), dps * 8);
     b.hp = b.maxHp;
     b.dmgAcc = 0;
@@ -1559,9 +1570,11 @@ class GameScene extends Phaser.Scene {
 
   goodGate() {
     const w = this.s.wave;
-    const kind = weighted([['add', 40], ['mul', w >= 2 ? 22 : 10], ['bolt', 18], ['slow', 14]]);
+    // Multiply gates are an early boost; a big squad only gets + gates.
+    const mulW = this.s.squad >= TUNING.mulSquadMax ? 0 : w >= 2 ? 13 : 8;
+    const kind = weighted([['add', 44], ['mul', mulW], ['bolt', 18], ['slow', 14]]);
     if (kind === 'add') return { kind, value: Math.round(3 + w * 1.5 + Math.random() * (3 + w)) };
-    if (kind === 'mul') return { kind, value: Math.random() < 0.75 ? 2 : 3 };
+    if (kind === 'mul') return { kind, value: Math.random() < 0.9 ? 2 : 3 };
     return { kind };
   }
 
@@ -1573,12 +1586,14 @@ class GameScene extends Phaser.Scene {
   }
 
   spawnGateRow() {
-    const a = this.goodGate();
-    let b = Math.random() < 0.6 ? this.badGate() : this.goodGate();
+    // From wave 3, some rows are two red gates: take the smaller loss or shoot one gold.
+    const bothRed = this.s.wave >= 3 && Math.random() < 0.25;
+    const a = bothRed ? this.badGate() : this.goodGate();
+    let b = bothRed ? this.badGate() : Math.random() < 0.6 ? this.badGate() : this.goodGate();
     // Never show two gates of the same kind and color in one row.
     const look = (g) => g.kind + (g.value < 0 ? '-' : '+');
     let tries = 0;
-    while (look(b) === look(a) && tries < 6) {
+    while (!bothRed && look(b) === look(a) && tries < 6) {
       b = Math.random() < 0.6 ? this.badGate() : this.goodGate();
       tries++;
     }
