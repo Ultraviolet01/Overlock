@@ -1505,7 +1505,7 @@ class GameScene extends Phaser.Scene {
       this.spawnGateRow();
       this.gateTimer = TUNING.gateEvery * (0.85 + Math.random() * 0.3);
     }
-    const fall = TUNING.gateFall * (1 + (this.s.wave - 1) * 0.04);
+    const fall = TUNING.gateFall * (1 + (this.s.wave - 1) * 0.02);
     for (let i = this.gateRows.length - 1; i >= 0; i--) {
       const row = this.gateRows[i];
       row.y += fall * dt;
