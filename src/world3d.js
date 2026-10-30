@@ -97,6 +97,7 @@ const World3D = {
     return Promise.all(GLB_MODELS.map((name) => new Promise((done) => {
       loader.load('./assets/models/' + name + '.glb', (gltf) => {
         this.templates[name] = this.normalize(gltf.scene, MODEL_SIZE[name]);
+        if (name === 'wraithking') this.templates[name].userData.float = 0.3;
         done();
       }, undefined, () => done());
     }))).then(() => { this.ready = true; });
