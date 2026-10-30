@@ -23,7 +23,7 @@ const ENEMIES = {
   },
   shield: {
     key: 'shield', scale: 0.68, hp: 8, speed: 110, r: 32, bite: 2, pts: 35, gain: 0.08, tag: true, armor: 0.4,
-    unlock: 7, weight: (w) => 6 + w, name: 'SHIELD SKELETON', tip: 'Its shield blocks most of each bolt',
+    unlock: 7, weight: (w) => 6 + w, name: 'SHIELD SKELETON', tip: 'Its shield blocks most of each spell',
   },
   summoner: {
     key: 'summoner', scale: 0.7, hp: 10, speed: 75, r: 32, bite: 2, pts: 60, gain: 0.15, tag: true, summons: true,
@@ -54,7 +54,7 @@ const UNIT = {
   champion: { key: 'champion', scale: 0.62 },
 };
 
-const MERGE_SIZE = 10;         // this many knights merge into one champion
+const MERGE_SIZE = 10;         // this many wizards merge into one archmage
 const MAX_UNITS = 40;          // sprites drawn for the squad
 const MAX_CHAMPIONS = 30;
 const SQUAD_MIN_X = 110;
@@ -744,7 +744,7 @@ class GameScene extends Phaser.Scene {
     };
     arrow(300, 150);
     arrow(420, 570);
-    const txt = this.add.text(W / 2, y, 'SWIPE LEFT OR RIGHT TO MOVE YOUR KNIGHTS', textStyle(24, '#ffffff')).setOrigin(0.5);
+    const txt = this.add.text(W / 2, y, 'SWIPE LEFT OR RIGHT TO MOVE YOUR WIZARDS', textStyle(24, '#ffffff')).setOrigin(0.5);
     const hand = this.add.image(W / 2, y + 100, 'hand');
     c.add([g, txt, hand]);
     this.tweens.add({ targets: hand, x: { from: 270, to: 450 }, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
@@ -1139,13 +1139,13 @@ class GameScene extends Phaser.Scene {
     let msg;
     if (reward === 'pierce') {
       s.pierce++;
-      msg = 'PIERCING BOLTS ' + s.pierce;
+      msg = 'PIERCING SPELLS ' + s.pierce;
     } else if (reward === 'power') {
       s.dmgMult *= 1.3;
-      msg = 'BOLT DAMAGE +30%';
+      msg = 'SPELL DAMAGE +30%';
     } else {
       const n = 5 + s.wave * 2;
-      msg = '+' + n + ' KNIGHTS';
+      msg = '+' + n + ' WIZARDS';
       this.setSquad(s.squad + n);
     }
     this.explode(this.burstGold, 40, b.x, b.y);
@@ -1338,7 +1338,7 @@ class GameScene extends Phaser.Scene {
     Sfx.tone(160, 0.25, 'square', 0.06, 0, 90);
   }
 
-  // Wraith King: raises a shield that blocks every bolt and calls wraiths,
+  // Wraith King: raises a shield that blocks every spell and calls wraiths,
   // then drops it. Damage only lands while the shield is down.
   updateShield(b, dt) {
     b.atkTimer -= dt;
@@ -1442,13 +1442,13 @@ class GameScene extends Phaser.Scene {
     switch (g.kind) {
       case 'add': {
         const v = Math.round(g.value);
-        return { text: (v >= 0 ? '+' : '') + v, sub: 'KNIGHTS', color: v > 0 ? COLORS.gold : COLORS.bad };
+        return { text: (v >= 0 ? '+' : '') + v, sub: 'WIZARDS', color: v > 0 ? COLORS.gold : COLORS.bad };
       }
-      case 'mul': return { text: 'x' + g.value, sub: 'KNIGHTS', color: COLORS.gold };
-      case 'div': return { text: '÷' + g.value, sub: 'KNIGHTS', color: COLORS.bad };
+      case 'mul': return { text: 'x' + g.value, sub: 'WIZARDS', color: COLORS.gold };
+      case 'div': return { text: '÷' + g.value, sub: 'WIZARDS', color: COLORS.bad };
       case 'fire': return { text: 'x2', sub: 'FIRE RATE', color: COLORS.speedGate };
       case 'trap': return { text: '-' + g.pct + '%', sub: 'FIRE RATE', color: COLORS.bad };
-      case 'bolt': return { text: '+50%', sub: 'BOLT SPEED', color: COLORS.speedGate };
+      case 'bolt': return { text: '+50%', sub: 'SPELL POWER', color: COLORS.speedGate };
       case 'slow': return { text: 'SLOW', sub: 'HORDE 5s', color: COLORS.speedGate };
     }
     return { text: '?', sub: '', color: COLORS.gold };
@@ -1550,7 +1550,7 @@ class GameScene extends Phaser.Scene {
         s.speed = Math.max(1, s.speed * (1 - g.pct / 100));
         break;
       case 'bolt':
-        msg = 'BOLT SPEED +50%';
+        msg = 'SPELL POWER +50%';
         s.boltMult = Math.min(2.5, s.boltMult * 1.5);
         break;
       case 'slow':
@@ -1702,8 +1702,8 @@ class GameScene extends Phaser.Scene {
     const status = [];
     if (this.s.slowTimer > 0) status.push('HORDE SLOW ' + Math.ceil(this.s.slowTimer) + 's');
     if (this.s.surgeTimer > 0) status.push('SURGE ' + Math.ceil(this.s.surgeTimer) + 's');
-    if (this.s.boltMult > 1) status.push('BOLT SPEED x' + this.s.boltMult.toFixed(1));
-    if (this.s.dmgMult > 1) status.push('BOLT DAMAGE x' + this.s.dmgMult.toFixed(1));
+    if (this.s.boltMult > 1) status.push('SPELL POWER x' + this.s.boltMult.toFixed(1));
+    if (this.s.dmgMult > 1) status.push('SPELL DAMAGE x' + this.s.dmgMult.toFixed(1));
     if (this.s.pierce > 0) status.push('PIERCE ' + this.s.pierce);
     this.statusText.setText(status.join('\n'));
 

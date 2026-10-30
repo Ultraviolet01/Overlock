@@ -42,8 +42,8 @@ const HEROES = {
   blitz: {
     key: 'blitz',
     name: 'BLITZ',
-    role: 'Fastest fire rate, light bolts',
-    short: 'Fastest fire',
+    role: 'Fastest cast speed, rapid spells',
+    short: 'Fastest caster',
     interval: 0.38,
     damage: 0.7,
     hitLoss: 1,
@@ -53,7 +53,7 @@ const HEROES = {
   tank: {
     key: 'tank',
     name: 'BULWARK',
-    role: 'Slow fire, hits barely slow you',
+    role: 'Slow cast, hits barely slow you',
     short: 'Shrugs off hits',
     interval: 0.55,
     damage: 1.2,

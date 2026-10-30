@@ -1,7 +1,7 @@
 // Home screen, laid out like Last War's: the live 3D road behind everything
 // with the squad marching on it and the airship hovering above, a player
 // cluster in the top-left corner, small icon buttons top-right, the logo, a
-// big START button, and the captain picker along the bottom.
+// big START button, and the wizard picker along the bottom.
 
 class TitleScene extends Phaser.Scene {
   constructor() {
@@ -10,7 +10,7 @@ class TitleScene extends Phaser.Scene {
 
   create() {
     this.t = 0;
-    this.selected = Store.get('captain', 'blitz');
+    this.selected = Store.get('wizard', 'blitz');
     if (!HEROES[this.selected]) this.selected = 'blitz';
 
     World3D.setActive(World3D.ready);
@@ -57,8 +57,8 @@ class TitleScene extends Phaser.Scene {
     if (!Store.get('seenHelp', false)) openHelp(this);
   }
 
-  // Top-left, like Last War's: captain portrait with a level-style badge
-  // (best wave), a fire-rate bar like their stamina bar, and slim strips.
+  // Top-left: wizard portrait with a level-style badge (best wave),
+  // a fire-rate bar, and slim strips.
   drawPlayerCluster() {
     const best = Store.get('best', null) || { wave: 0, topSpeed: 1, score: 0 };
     const px = 18;
@@ -93,7 +93,7 @@ class TitleScene extends Phaser.Scene {
     uiStrip(this, sx, py + 74, 'skull', 0.85, 22, '#c9d6d2').set(best.wave ? 'BEST WAVE ' + best.wave : 'NO RUNS YET');
   }
 
-  // Bottom strip: three captain tiles; the chosen one is framed in gold and
+  // Bottom strip: three wizard tiles; the chosen one is framed in gold and
   // leads the squad on the road.
   drawCaptainPicker() {
     const top = H - 300;
@@ -102,7 +102,7 @@ class TitleScene extends Phaser.Scene {
     g.fillRoundedRect(20, top, W - 40, 262, 18);
     g.lineStyle(2, 0xffffff, 0.2);
     g.strokeRoundedRect(20, top, W - 40, 262, 18);
-    this.add.text(W / 2, top - 4, 'CAPTAIN', textStyle(26, '#f2c14e')).setOrigin(0.5);
+    this.add.text(W / 2, top - 4, 'WIZARD', textStyle(26, '#f2c14e')).setOrigin(0.5);
     this.roleText = this.add.text(W / 2, top + 238, '', textStyle(20, '#ffffff', { strokeThickness: 4 })).setOrigin(0.5);
     this.tiles = {};
     ['blitz', 'tank', 'surge'].forEach((key, i) => {
@@ -148,7 +148,7 @@ class TitleScene extends Phaser.Scene {
 
   select(key) {
     this.selected = key;
-    Store.set('captain', key);
+    Store.set('wizard', key);
     this.refreshTiles();
   }
 

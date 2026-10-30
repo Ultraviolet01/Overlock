@@ -10,14 +10,23 @@ function makeTextures(scene) {
     g.generateTexture(key, w, h);
   }
 
-  // Spectral bolt fired by the knights.
-  bake('bolt', 14, 40, (g) => {
-    g.fillStyle(COLORS.knight, 0.3);
-    g.fillEllipse(7, 20, 14, 40);
-    g.fillStyle(COLORS.knight, 0.8);
-    g.fillEllipse(7, 18, 8, 30);
+  // Magic orb fired by the wizards.
+  bake('bolt', 20, 38, (g) => {
+    // Outer glow halo
+    g.fillStyle(0x7b3dff, 0.15);
+    g.fillCircle(10, 18, 10);
+    g.fillEllipse(10, 22, 12, 38);
+    // Middle swirl
+    g.fillStyle(0x9f6aff, 0.5);
+    g.fillCircle(10, 16, 7);
+    g.fillEllipse(10, 20, 8, 26);
+    // Bright core
+    g.fillStyle(0xd4b8ff, 0.9);
+    g.fillCircle(10, 14, 4);
+    g.fillEllipse(10, 16, 5, 14);
+    // White-hot center
     g.fillStyle(0xffffff, 1);
-    g.fillEllipse(7, 14, 4, 18);
+    g.fillCircle(10, 13, 2);
   });
 
   // Rune barrel: break it for an upgrade before it rolls into the squad.
@@ -193,11 +202,16 @@ function makeTextures(scene) {
     g.fillRect(0, 0, 4, 80);
   });
 
-  bake('flash', 48, 48, (g) => {
-    g.fillStyle(COLORS.knight, 0.35);
-    g.fillCircle(24, 24, 24);
-    g.fillStyle(0xffffff, 0.9);
-    g.fillCircle(24, 24, 10);
+  // Magic cast burst from wizard staffs.
+  bake('flash', 56, 56, (g) => {
+    g.fillStyle(0x7b3dff, 0.2);
+    g.fillCircle(28, 28, 28);
+    g.fillStyle(0x9f6aff, 0.4);
+    g.fillCircle(28, 28, 18);
+    g.fillStyle(0xd4b8ff, 0.7);
+    g.fillCircle(28, 28, 10);
+    g.fillStyle(0xffffff, 0.95);
+    g.fillCircle(28, 28, 5);
   });
 
   bake('fog', W, 360, (g) => {
