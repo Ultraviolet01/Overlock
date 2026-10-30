@@ -17,7 +17,7 @@ const MODEL_SIZE = {
 // Natural height of each hand-built model before scaling.
 const HAND_BASE = {
   walker: 1.15, wraith: 1.25, bloater: 1.4, shield: 1.35, summoner: 1.45, splitter: 0.9, slimelet: 0.45,
-  colossus: 3.3, brood: 2.6, wraithking: 3.4, barrel: 0.75,
+  barrel: 0.75,
 };
 
 // Walk cycle for the AI models, which are single solid meshes with no
@@ -31,10 +31,13 @@ const GAIT = {
   brute: { hip: 0.4, stride: 0.18, arms: [0.35, 0.75], armX: 0.6 },
   boss: { hip: 0.42, stride: 0.12, arms: [0.3, 0.7], armX: 0.6 },
   sprinter: { hip: 0.75, stride: 0.22, quad: true, arms: [2, 2], armX: 1 },
+  colossus: { hip: 0.38, stride: 0.1, arms: [0.3, 0.7], armX: 0.6 },
+  brood: { hip: 0.35, stride: 0.08, quad: true, arms: [2, 2], armX: 1 },
+  wraithking: { hip: 0.42, stride: 0.1, arms: [0.3, 0.7], armX: 0.6 },
 };
 
 // AI-generated textured models; every other kind is built from shapes below.
-const GLB_MODELS = ['knight', 'walker', 'sprinter', 'brute', 'boss'];
+const GLB_MODELS = ['knight', 'walker', 'sprinter', 'brute', 'boss', 'colossus', 'brood', 'wraithking'];
 
 const World3D = {
   active: false,
