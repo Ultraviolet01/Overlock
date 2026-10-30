@@ -1,0 +1,42 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Overclock cover</title>
+<style>
+  @font-face { font-family: 'Lilita One'; src: url('../assets/fonts/lilita-one.woff2') format('woff2'); font-display: block; }
+  html, body { margin: 0; background: #0b1412; }
+  .cover { position: relative; width: 630px; height: 500px; overflow: hidden; background: radial-gradient(ellipse at 75% 40%, #1d3b37 0%, #0f1f1c 55%, #0b1412 100%); font-family: 'Lilita One', 'Arial Black', sans-serif; }
+  .shot { position: absolute; left: 0; top: 0; height: 500px; width: 330px; background: url('screenshot-2-gates.png') -47px -118px / 423px auto no-repeat;
+    -webkit-mask-image: linear-gradient(90deg, #000 70%, transparent 100%); mask-image: linear-gradient(90deg, #000 70%, transparent 100%); }
+  .speed { position: absolute; left: 0; top: 0; width: 630px; height: 500px;
+    background: repeating-linear-gradient(100deg, transparent 0 46px, rgba(79,224,255,0.07) 46px 49px); }
+  .logo { position: absolute; left: 262px; top: 132px; width: 360px; text-align: center; font-style: italic; font-size: 60px; line-height: 1; }
+  .logo span { position: absolute; left: 0; right: 0; }
+  .logo .back { color: #0a0f0e; -webkit-text-stroke: 12px #0a0f0e; text-shadow: 0 6px 0 #000; }
+  .logo .front { background: linear-gradient(180deg, #ffffff 18%, #9fdcff 52%, #2f86d6 92%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .tag { position: absolute; left: 262px; top: 206px; width: 360px; text-align: center; font-style: italic; font-size: 26px; color: #f2c14e;
+    -webkit-text-stroke: 6px #0a0f0e; paint-order: stroke fill; }
+  .chips { position: absolute; left: 280px; top: 268px; width: 225px; display: flex; flex-direction: column; gap: 9px; }
+  .chip { font-size: 17px; color: #fff; background: rgba(10,15,14,0.78); border: 2px solid rgba(255,255,255,0.14); border-radius: 10px; padding: 7px 12px;
+    -webkit-text-stroke: 3px #0a0f0e; paint-order: stroke fill; }
+  .chip b { color: #4fe0ff; font-weight: normal; }
+  .chip i { color: #f2c14e; font-style: normal; }
+  .mage { position: absolute; right: 4px; bottom: -6px; height: 175px; filter: drop-shadow(0 0 14px rgba(79,224,255,0.45)); }
+</style>
+</head>
+<body>
+  <div class="cover" id="cover">
+    <div class="shot"></div>
+    <div class="speed"></div>
+    <div class="logo"><span class="back">OVERCLOCK</span><span class="front">OVERCLOCK</span></div>
+    <div class="tag">FIRE FASTER OR FALL</div>
+    <div class="chips">
+      <div class="chip"><b>SPEED</b> builds as you run</div>
+      <div class="chip">Hit <b>x5</b> to OVERCLOCK</div>
+      <div class="chip">Grow your <i>wizard army</i></div>
+    </div>
+    <img class="mage" src="../assets/champion.png" alt="">
+  </div>
+</body>
+</html>
