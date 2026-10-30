@@ -83,6 +83,20 @@ function makeTextures(scene) {
     }
   });
 
+  // Heart beside the squad count: the wizards are the player's health.
+  bake('heart', 48, 44, (g) => {
+    g.fillStyle(0x0b0b0b, 1);
+    g.fillCircle(14, 15, 13);
+    g.fillCircle(34, 15, 13);
+    g.fillTriangle(2, 19, 46, 19, 24, 43);
+    g.fillStyle(0xe0413a, 1);
+    g.fillCircle(14, 15, 10);
+    g.fillCircle(34, 15, 10);
+    g.fillTriangle(5, 18, 43, 18, 24, 38);
+    g.fillStyle(0xff9a8a, 1);
+    g.fillCircle(12, 12, 4);
+  });
+
   // Skull marker for the boss health bar and the next-horror progress bar.
   bake('skull', 40, 40, (g) => {
     g.fillStyle(0x0b0b0b, 1);

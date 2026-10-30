@@ -253,6 +253,7 @@ class GameScene extends Phaser.Scene {
     this.knights.forEach((o) => add(o, true));
     this.bullets.getChildren().forEach((o) => add(o));
     add(this.squadLabel);
+    add(this.squadHeart);
     if (this.airship) add(this.airship);
     if (this.drops) {
       this.drops.forEach((d) => {
@@ -356,6 +357,7 @@ class GameScene extends Phaser.Scene {
     }
     this.squadLabel = this.add.text(this.squadX, LINE_Y - 90, '', textStyle(54, '#ffffff', { fontStyle: 'italic' }))
       .setOrigin(0.5).setDepth(46);
+    this.squadHeart = this.add.image(this.squadX, LINE_Y - 90, 'heart').setDepth(46);
     this.setSquad(this.s.squad, true);
   }
 
@@ -528,6 +530,15 @@ class GameScene extends Phaser.Scene {
       this.tweens.killTweensOf(this.squadLabel);
       this.squadLabel.setScale(1.35);
       this.tweens.add({ targets: this.squadLabel, scale: 1, duration: 220, ease: 'Back.easeOut' });
+      if (this.s.squad < prev) {
+        this.squadLabel.setColor('#ff5a4f');
+        this.squadHeart.setTintFill(0xffffff);
+        if (this.hurtTimer) this.hurtTimer.remove();
+        this.hurtTimer = this.time.delayedCall(260, () => {
+          this.squadLabel.setColor('#ffffff');
+          this.squadHeart.clearTint();
+        });
+      }
     }
     if (this.s.squad <= 0) this.gameOver();
   }
@@ -636,6 +647,7 @@ class GameScene extends Phaser.Scene {
     this.introActive = true;
     this.introT = 0;
     this.squadLabel.setVisible(false);
+    this.squadHeart.setVisible(false);
     this.airship = this.add.image(W / 2, LINE_Y - 400, 'airship').setDepth(40).setScale(World3D.active ? 0.85 : 1.45);
     this.airship.lift = 260;
     this.drops = [];
@@ -719,6 +731,7 @@ class GameScene extends Phaser.Scene {
     if (this.airship) this.airship.leaving = true;
     this.knights.forEach((k) => { k.lift = 0; });
     this.squadLabel.setVisible(true);
+    this.squadHeart.setVisible(true);
     this.banner('WAVE 1', '#f2c14e', 'Hold the road');
     this.startTutorial();
   }
@@ -779,6 +792,8 @@ class GameScene extends Phaser.Scene {
     } else {
       this.squadLabel.setPosition(this.squadX, LINE_Y - 100 - spread * 0.55);
     }
+    this.squadHeart.setPosition(this.squadX - this.squadLabel.width / 2 - 30, this.squadLabel.y);
+    this.squadHeart.h3 = this.squadLabel.h3;
   }
 
   // ---------------------------------------------------------------- shooting
