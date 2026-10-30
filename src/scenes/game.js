@@ -546,7 +546,7 @@ class GameScene extends Phaser.Scene {
 
   waveScale() {
     const w = this.s.wave - 1;
-    return 1 + w * 0.5 + w * w * 0.13;
+    return 1 + w * 0.6 + w * w * TUNING.hpCurve;
   }
 
   hordeMult() {
@@ -1032,7 +1032,7 @@ class GameScene extends Phaser.Scene {
     this.spawnTimer -= dt;
     if (this.spawnTimer > 0) return;
     const w = this.s.wave;
-    const base = Math.max(0.16, 1.0 / (1 + (w - 1) * 0.28));
+    const base = Math.max(0.12, 1.0 / (1 + (w - 1) * 0.35));
     this.spawnTimer = base * (this.s.bossActive ? 2.6 : 1) * (0.7 + Math.random() * 0.6);
 
     const summoners = this.enemies.getChildren().filter((e) => e.active && e.def && e.def.summons).length;
@@ -1333,7 +1333,7 @@ class GameScene extends Phaser.Scene {
     // At least the wave's base health, and at least about 8 seconds of the
     // squad's current firepower, so a huge squad still gets a real fight.
     const dps = this.squadPower() * this.hero.damage * this.s.dmgMult * this.fireMult(this.effSpeed()) / this.hero.interval;
-    b.maxHp = Math.max(900 * Math.pow(this.s.wave / TUNING.bossEvery, 1.6), dps * 8);
+    b.maxHp = Math.max(900 * Math.pow(this.s.wave / TUNING.bossEvery, 1.6), dps * TUNING.bossSeconds);
     b.hp = b.maxHp;
     b.dmgAcc = 0;
     b.lastNum = 0;

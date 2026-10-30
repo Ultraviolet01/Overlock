@@ -37,10 +37,12 @@ const TUNING = {
   overclockTime: 5,        // seconds of OVERCLOCK at max speed
   bossTime: 14,            // seconds the boss needs to reach the squad
   squadCap: 9999,
-  powerCurve: 0.45,        // firepower grows as squad^0.45, so 1000 wizards hit ~11x harder than 5
+  powerCurve: 0.4,         // firepower grows as squad^0.4, so 1000 wizards hit ~8x harder than 5
+  hpCurve: 0.2,            // enemy health grows with the square of the wave times this
+  bossSeconds: 10,         // a boss has at least this many seconds of the squad's firepower in health
   biteShare: 0.015,        // each bite also takes this share of the squad per point of bite
   mulSquadMax: 400,        // x2/x3 gates stop appearing once the squad is this big
-  extraEvery: 4,           // one extra enemy per spawn for every 4 waves
+  extraEvery: 3,           // one extra enemy per spawn for every 3 waves
 };
 
 const HEROES = {
