@@ -28,12 +28,13 @@ const COLORS = {
 const TUNING = {
   waveLength: 15,          // seconds per wave; the horde speeds up each wave
   bossEvery: 5,            // a boss charges at the start of every 5th wave
-  maxSpeed: 10,            // fire rate multiplier cap
+  maxSpeed: 5,             // speed cap; reaching it triggers OVERCLOCK
   maxShooters: 8,          // bullets per volley; bigger squads hit harder instead
   boltSpeed: 1300,
   gateEvery: 8.5,          // seconds between gate rows
   gateFall: 120,           // gate fall speed in world units per second
-  speedDecay: 0.05,        // fire rate lost per second, so you must keep killing
+  speedDecay: 0.09,        // share of current speed lost per second, so you must keep killing
+  overclockTime: 5,        // seconds of OVERCLOCK at max speed
   bossTime: 14,            // seconds the boss needs to reach the squad
   squadCap: 9999,
 };

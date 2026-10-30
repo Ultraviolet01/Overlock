@@ -4,16 +4,19 @@ A portrait, one-thumb horde shooter built for Slapjam AI 2. The jam theme is **S
 
 ## How to play
 
-- Drag left or right to steer your squad of cursed knights. They shoot on their own.
-- Every kill raises your fire rate (the gauge at the top, from x1.0 to x10).
-- Every zombie that reaches your line kills knights and slows your fire rate.
-- Cards fall toward you. Walk through one to take its effect:
-  - Gold cards change the squad: `+8`, `x2`, `x3`.
-  - Red gates take wizards: a big random number like `-30`.
-  - Teal cards boost speed: fire rate `x2`, bolt speed `+50%`, or horde slow for 5 seconds.
-- Shoot the `+` and `-` gates to raise their number. A higher fire rate pumps them up faster. A red `-30` climbs toward zero, turns gold, and then gives wizards.
-- Every 10 knights merge into one champion, so a squad of hundreds stays readable.
-- Rune barrels roll down a lane. Shoot one open for piercing bolts, extra bolt damage or more knights. If you don't break it and it reaches your squad, it crashes into it.
+- Drag left or right to steer your squad of wizards. They cast spells on their own.
+- Speed is everything. The meter at the bottom runs from x1.0 to x5.0, and the faster you go, the faster your spells fly.
+- Speed drains fast. Every kill, gate and barrel pushes it back up; every bite knocks it down.
+- Your speed multiplies every point of score (shown as `SCORE x3` next to the meter).
+- Hit x5 to trigger OVERCLOCK: 5 seconds of piercing spells, a glowing squad and a wider, faster view.
+- Enemies that reach your squad latch on and keep biting until you shoot them down. A boss that reaches you keeps smashing.
+- Gates come toward you in pairs. Walk through one to take its effect:
+  - Gold gates add or multiply wizards: `+8`, `x2`, `x3`.
+  - Cyan gates speed you up (`+0.8`), boost spell power, or slow the horde.
+  - Red gates take wizards (`-30`) or slow you down (`-1.5`).
+- Shoot the wizard and speed gates to raise their number. A red `-30` or `-1.5` climbs toward zero, flips color, and then helps you.
+- Every 10 wizards merge into one archmage, so a squad of hundreds stays readable.
+- Rune barrels roll down a lane. Shoot one open for piercing bolts, extra spell damage or more wizards. If you don't break it and it reaches your squad, it crashes into it.
 - The horde speeds up every 15 seconds and new enemy types join as the waves climb. The first time one appears, its name and a tip show on screen.
 - Every 5th wave a boss charges at you. Kill it before it reaches your knights. Bosses take turns, then repeat tougher.
 

@@ -165,7 +165,7 @@ const Music = {
   // Called every frame. Schedules a little ahead so timing stays tight.
   update(speed) {
     if (!this.playing || !Sfx.ctx) return;
-    const bpm = 92 + (speed - 1) * 13;
+    const bpm = 92 + (speed - 1) * 29;
     const stepDur = 60 / bpm / 2;
     const ahead = Sfx.ctx.currentTime + 0.12;
     if (this.nextTime < Sfx.ctx.currentTime - 0.5) this.nextTime = Sfx.ctx.currentTime;

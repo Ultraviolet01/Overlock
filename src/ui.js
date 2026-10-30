@@ -288,7 +288,7 @@ function openHelp(scene, onClose) {
   const panel = uiModal(scene, 660, 1120, 'HOW TO PLAY');
   const rows = [
     [() => scene.add.image(0, 0, 'knight').setScale(0.42), 'STEER', 'Drag left or right. Your wizards cast spells on their own.'],
-    [() => scene.add.image(0, 0, 'icon_flame').setScale(1.1), 'FIRE RATE IS SPEED', 'Kills speed it up. Bites slow it down.'],
+    [() => scene.add.image(0, 0, 'icon_flame').setScale(1.1), 'SPEED IS EVERYTHING', 'It drains fast: keep killing. Speed multiplies score. Hit x5 to OVERCLOCK.'],
     [() => miniCard(scene, 0, 0, '+8', COLORS.gold), 'GOLD GATES', 'Walk through to add or multiply wizards. Shoot them to raise the number.'],
     [() => miniCard(scene, 0, 0, '-30', COLORS.bad), 'RED GATES', 'They take wizards. Shoot them: the number climbs, turns gold and gives wizards.'],
     [() => scene.add.image(0, 0, 'barrel').setScale(0.75), 'RUNE BARRELS', 'Break one for an upgrade, or it crashes into you.'],

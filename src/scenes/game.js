@@ -124,6 +124,7 @@ class GameScene extends Phaser.Scene {
       boltMult: 1,
       dmgMult: 1,
       pierce: 0,
+      overclock: 0,
       slowTimer: 0,
       surgeTimer: 0,
       surgeCd: 0,
@@ -453,7 +454,10 @@ class GameScene extends Phaser.Scene {
     this.add.image(46, H - 70, 'icon_flame').setScale(1.2).setDepth(52);
     this.speedText = this.add.text(84, H - 104, 'x1.0', textStyle(60, '#ffffff', { fontStyle: 'italic' }))
       .setOrigin(0, 0.5).setDepth(52);
-    this.add.text(470, H - 104, 'FIRE RATE', textStyle(20, '#ffffff', { strokeThickness: 4 })).setOrigin(1, 0.5).setDepth(52);
+    this.speedLabel = this.add.text(470, H - 118, 'SPEED', textStyle(22, '#ffffff', { strokeThickness: 4 })).setOrigin(1, 0.5).setDepth(52);
+    this.multText = this.add.text(470, H - 92, 'SCORE x1', textStyle(22, '#f2c14e', { strokeThickness: 4 })).setOrigin(1, 0.5).setDepth(52);
+    this.edgeGlow = this.add.image(W / 2, H / 2, 'edgeglow').setDisplaySize(W, H).setDepth(49)
+      .setBlendMode(Phaser.BlendModes.ADD).setAlpha(0);
 
     if (this.hero.ability === 'surge') {
       this.surgeBtn = this.add.container(W - 92, H - 92).setDepth(52);
@@ -521,6 +525,16 @@ class GameScene extends Phaser.Scene {
 
   effSpeed() {
     return Math.min(this.s.speed, TUNING.maxSpeed) * (this.s.surgeTimer > 0 ? 2 : 1);
+  }
+
+  // How fast spells fly out at a given speed: x5 speed fires 10 times as fast.
+  fireMult(eff) {
+    return 1 + (eff - 1) * 2.25;
+  }
+
+  // Every point of score is multiplied by the current speed.
+  scoreMult() {
+    return Math.max(1, Math.floor(this.effSpeed() + 0.001));
   }
 
   waveScale() {
@@ -646,7 +660,14 @@ class GameScene extends Phaser.Scene {
     if (s.slowTimer > 0) s.slowTimer -= dt;
     if (s.surgeTimer > 0) s.surgeTimer -= dt;
     if (s.surgeCd > 0) s.surgeCd -= dt;
-    if (s.speed > 1) this.addSpeed(-TUNING.speedDecay * dt);
+    if (s.overclock > 0) {
+      s.overclock -= dt;
+      if (s.overclock <= 0) this.endOverclock();
+    } else if (s.speed >= TUNING.maxSpeed) {
+      this.startOverclock();
+    } else if (s.speed > 1) {
+      this.addSpeed(-TUNING.speedDecay * s.speed * dt);
+    }
 
     const eff = this.effSpeed();
     s.topSpeed = Math.max(s.topSpeed, eff);
@@ -821,9 +842,12 @@ class GameScene extends Phaser.Scene {
       const ty = LINE_Y + kn.off.y + Math.sin(this.elapsed * bobRate + kn.phase) * 3;
       kn.x += (tx - kn.x) * k;
       kn.y += (ty - kn.y) * k;
+      kn.glow = this.s.overclock > 0;
       if (kn.hitFlash > 0) {
         kn.hitFlash -= dt;
         kn.setTint(0xff5a50);
+      } else if (kn.glow) {
+        kn.setTint(0x9fefff);
       } else if (kn.isTinted) {
         kn.clearTint();
       }
@@ -842,7 +866,7 @@ class GameScene extends Phaser.Scene {
   // ---------------------------------------------------------------- shooting
 
   updateFiring(dt, eff) {
-    const interval = this.hero.interval / eff;
+    const interval = this.hero.interval / this.fireMult(eff);
     this.fireTimer -= dt;
     if (this.fireTimer < -interval * 3) this.fireTimer = 0;
     while (this.fireTimer <= 0) {
@@ -868,7 +892,7 @@ class GameScene extends Phaser.Scene {
       b.setVelocity((Math.random() - 0.5) * 50, -vy);
       b.dmg = dmg;
       b.h3 = 55;
-      b.pierce = this.s.pierce;
+      b.pierce = this.s.pierce + (this.s.overclock > 0 ? 2 : 0);
       b.lastHit = null;
     }
     const kn = this.knights[Math.floor(Math.random() * shown)];
@@ -877,7 +901,7 @@ class GameScene extends Phaser.Scene {
       .setScale(0.5 + eff * 0.08);
     this.tweens.add({ targets: f, alpha: 0, scale: f.scale * 1.6, duration: 90, onComplete: () => f.destroy() });
     Sfx.shoot(eff);
-    if (eff > 5) this.shake(50, 0.0004 * eff);
+    if (eff > 4) this.shake(50, 0.0008 * eff);
   }
 
   killBullet(b) {
@@ -967,6 +991,7 @@ class GameScene extends Phaser.Scene {
     e.dmgAcc = 0;
     e.lastNum = 0;
     e.hitFlash = 0;
+    e.latched = false;
     e.wobble = Math.random() * Math.PI * 2;
     e.summonT = 2;
     if (def.name && !this.seen[type]) {
@@ -1050,10 +1075,26 @@ class GameScene extends Phaser.Scene {
           for (const off of [-50, 50]) this.spawnEnemy('walker', clamp(e.x + off, 110, W - 110), e.y + 30);
         }
       }
+      // Enemies that reach the squad stay on its front line and keep biting
+      // until they are shot down.
+      const front = LINE_Y - this.squadSpread() * 0.55 - 34;
+      if (!e.latched && e.y >= front) {
+        e.latched = true;
+        e.biteT = 0;
+      }
+      if (e.latched) {
+        e.y = front;
+        vy = 0;
+        vx = clamp((this.squadX + (e.wobble % 1 - 0.5) * this.squadSpread() - e.x) * 4, -400, 400);
+        e.biteT -= dt;
+        if (e.biteT <= 0) {
+          e.biteT = 0.9;
+          this.bite(e);
+        }
+      }
       e.setVelocity(vx, vy);
       e.setFlipX(vx < -20);
       this.applyHitFlash(e);
-      if (e.y >= LINE_Y - 30) this.bite(e);
       if (this.s.over) return;
     }
   }
@@ -1085,7 +1126,6 @@ class GameScene extends Phaser.Scene {
 
   bite(e) {
     const lost = e.def.bite * Math.ceil(this.s.wave / 3);
-    e.disableBody(true, true);
     this.addSpeed(-0.3 * e.def.bite * this.hero.hitLoss);
     this.explode(this.burstRed, 14, e.x, LINE_Y - 10);
     this.popNumber(this.squadX, LINE_Y - 230, '-' + lost, '#e0413a', 40);
@@ -1106,8 +1146,8 @@ class GameScene extends Phaser.Scene {
     e.disableBody(true, true);
     if (!rewarded) return;
     this.s.kills++;
-    this.s.score += e.def.pts * Math.ceil(eff);
-    this.addSpeed(e.def.gain);
+    this.s.score += e.def.pts * this.scoreMult();
+    this.addSpeed(e.def.gain * 4);
     const green = e.def.key === 'sprinter' || e.def.key === 'wraith' || e.def.key === 'bloater';
     this.explode(green ? this.burstRot : this.burstRed, e.def.tag ? 26 : 10, e.x, e.y);
     Sfx.kill();
@@ -1206,6 +1246,21 @@ class GameScene extends Phaser.Scene {
     }
   }
 
+  startOverclock() {
+    const s = this.s;
+    s.overclock = TUNING.overclockTime;
+    this.banner('OVERCLOCK!', '#4fe0ff', 'Spells pierce. Max speed');
+    this.cameras.main.flash(160, 79, 224, 255);
+    this.shake(250, 0.008);
+    Sfx.surge();
+    vibrate(60);
+  }
+
+  endOverclock() {
+    this.s.overclock = 0;
+    this.s.speed = TUNING.maxSpeed * 0.7;
+  }
+
   barrelCrash(b) {
     b.disableBody(true, true);
     const lost = Math.ceil(this.s.squad * 0.15) + 2;
@@ -1262,9 +1317,11 @@ class GameScene extends Phaser.Scene {
     b.setDepth(11).clearTint();
     b.isBoss = true;
     b.isBarrel = false;
+    b.reached = false;
+    b.smashT = undefined;
     // At least the wave's base health, and at least about 8 seconds of the
     // squad's current firepower, so a huge squad still gets a real fight.
-    const dps = this.s.squad * this.hero.damage * this.s.dmgMult * this.effSpeed() / this.hero.interval;
+    const dps = this.s.squad * this.hero.damage * this.s.dmgMult * this.fireMult(this.effSpeed()) / this.hero.interval;
     b.maxHp = Math.max(900 * Math.pow(this.s.wave / TUNING.bossEvery, 1.6), dps * 8);
     b.hp = b.maxHp;
     b.dmgAcc = 0;
@@ -1307,7 +1364,15 @@ class GameScene extends Phaser.Scene {
     const reach = clamp((b.y - b.startY) / (b.endY - b.startY), 0, 1);
     this.drawBossBar(hpRatio, reach, b.hp);
 
-    if (b.y >= b.endY) this.bossSmash(b);
+    if (b.y >= b.endY) {
+      b.y = b.endY;
+      b.setVelocity(0, 0);
+      b.smashT = (b.smashT === undefined ? 0 : b.smashT) - dt;
+      if (b.smashT <= 0) {
+        b.smashT = 2.2;
+        this.bossSmash(b);
+      }
+    }
   }
 
   // The boss marks a lane where the squad stands, then slams it.
@@ -1459,9 +1524,11 @@ class GameScene extends Phaser.Scene {
     this.s.bossActive = false;
   }
 
+  // A boss that reaches the squad stays and smashes it until it is killed.
   bossSmash(b) {
-    this.endBoss(b);
-    const lost = Math.ceil(this.s.squad * 0.5) + 3;
+    const first = !b.reached;
+    b.reached = true;
+    const lost = Math.ceil(this.s.squad * 0.25) + 2;
     this.addSpeed(-2 * this.hero.hitLoss);
     this.explode(this.burstRed, 60, this.squadX, LINE_Y - 40);
     this.popNumber(this.squadX, LINE_Y - 250, '-' + lost, '#e0413a', 56);
@@ -1469,7 +1536,7 @@ class GameScene extends Phaser.Scene {
     this.cameras.main.flash(200, 160, 20, 20);
     Sfx.bite();
     Sfx.bossRoar();
-    this.banner('IT BROKE THROUGH', '#e0413a');
+    if (first) this.banner('KILL IT!', '#e0413a', 'It is smashing your wizards');
     vibrate(250);
     this.setSquad(this.s.squad - lost);
   }
@@ -1478,7 +1545,7 @@ class GameScene extends Phaser.Scene {
     this.endBoss(b);
     this.s.bosses++;
     this.s.kills++;
-    this.s.score += Math.round(1000 * (this.s.wave / TUNING.bossEvery) * Math.ceil(this.effSpeed()));
+    this.s.score += Math.round(1000 * (this.s.wave / TUNING.bossEvery) * this.scoreMult());
     this.addSpeed(1.5);
     this.explode(this.burstRed, 80, b.x, b.y);
     this.explode(this.burstGold, 60, b.x, b.y);
@@ -1492,8 +1559,9 @@ class GameScene extends Phaser.Scene {
 
   goodGate() {
     const w = this.s.wave;
-    const kind = weighted([['add', 34], ['mul', w >= 2 ? 20 : 8], ['fire', 15], ['bolt', 13], ['slow', 12]]);
+    const kind = weighted([['add', 32], ['mul', w >= 2 ? 18 : 8], ['speed', 22], ['bolt', 12], ['slow', 10]]);
     if (kind === 'add') return { kind, value: Math.round(3 + w * 1.5 + Math.random() * (3 + w)) };
+    if (kind === 'speed') return { kind, value: Math.round(5 + Math.random() * 6) / 10 };
     if (kind === 'mul') return { kind, value: Math.random() < 0.75 ? 2 : 3 };
     return { kind };
   }
@@ -1502,6 +1570,7 @@ class GameScene extends Phaser.Scene {
   // the number up until it crosses zero and turns into a gold gate.
   badGate() {
     const w = this.s.wave;
+    if (Math.random() < 0.3) return { kind: 'speed', value: -Math.round(10 + Math.random() * 10) / 10 };
     return { kind: 'add', value: -Math.round(10 + w * 3 + Math.random() * (15 + w * 4)) };
   }
 
@@ -1521,8 +1590,8 @@ class GameScene extends Phaser.Scene {
       const x = W / 2 + (i === 0 ? -1 : 1) * (CARD_W + GATE_GAP) / 2;
       const c = this.add.container(x, row.y).setDepth(5);
       c.gate = p;
-      // Shooting raises the number on +/- gates.
-      c.shootable = p.kind === 'add';
+      // Shooting raises the number on wizard and speed gates.
+      c.shootable = p.kind === 'add' || p.kind === 'speed';
       c.h3 = 0;
       c.startValue = p.value || 0;
       c.bg = this.add.graphics();
@@ -1543,7 +1612,10 @@ class GameScene extends Phaser.Scene {
         return { text: (v >= 0 ? '+' : '') + v, sub: v > 0 ? 'ADD WIZARDS' : 'LOSE WIZARDS', color: v > 0 ? COLORS.gold : COLORS.bad, icon: 'knight' };
       }
       case 'mul': return { text: 'x' + g.value, sub: 'MULTIPLY WIZARDS', color: COLORS.gold, icon: 'knight' };
-      case 'fire': return { text: 'x2', sub: 'DOUBLE FIRE RATE', color: COLORS.speedGate, icon: 'icon_flame' };
+      case 'speed': {
+        const v = Math.round(g.value * 10) / 10;
+        return { text: (v >= 0 ? '+' : '') + v.toFixed(1), sub: v >= 0 ? 'SPEED UP' : 'SLOW DOWN', color: v >= 0 ? COLORS.speedGate : COLORS.bad, icon: 'icon_flame' };
+      }
       case 'bolt': return { text: '+50%', sub: 'SPELL POWER UP', color: COLORS.speedGate, icon: 'bolt' };
       case 'slow': return { text: 'SLOW', sub: 'FREEZE HORDE 5s', color: COLORS.speedGate, icon: 'skull' };
     }
@@ -1580,6 +1652,10 @@ class GameScene extends Phaser.Scene {
       const step = start < 0 ? 0.34 + -start * 0.012 : 0.34;
       const cap = start < 0 ? -start * 0.5 + 5 + this.s.wave * 2 : start + 30 + this.s.wave * 3;
       g.value = Math.min(cap, g.value + step);
+    } else if (g.kind === 'speed') {
+      const start = c.startValue;
+      const step = start < 0 ? 0.012 + -start * 0.012 : 0.01;
+      g.value = Math.min(start < 0 ? 1 : start + 1.5, g.value + step);
     }
     const info = this.cardInfo(g);
     if (info.text !== c.shownText) {
@@ -1636,10 +1712,13 @@ class GameScene extends Phaser.Scene {
         msg = 'x' + g.value;
         this.setSquad(s.squad * g.value);
         break;
-      case 'fire':
-        msg = 'FIRE RATE x2';
-        s.speed = Math.min(TUNING.maxSpeed, s.speed * 2);
+      case 'speed': {
+        const v = Math.round(g.value * 10) / 10;
+        good = v >= 0;
+        msg = (v >= 0 ? 'SPEED +' : 'SPEED ') + v.toFixed(1);
+        this.addSpeed(v);
         break;
+      }
       case 'bolt':
         msg = 'SPELL POWER +50%';
         s.boltMult = Math.min(2.5, s.boltMult * 1.5);
@@ -1670,7 +1749,7 @@ class GameScene extends Phaser.Scene {
     if (this.s.waveTime < TUNING.waveLength) return;
     this.s.waveTime = 0;
     this.s.wave++;
-    this.s.score += 100 * this.s.wave;
+    this.s.score += 100 * this.s.wave * this.scoreMult();
     const record = this.bestWave > 0 && this.s.wave > this.bestWave;
     if (record) {
       this.bestStrip.set('BEST ' + this.s.wave);
@@ -1699,7 +1778,7 @@ class GameScene extends Phaser.Scene {
 
   updateSpeedFx(dt, eff) {
     const ratio = clamp((eff - 1) / (TUNING.maxSpeed - 1), 0, 1.5);
-    const roadSpeed = 180 + eff * 95;
+    const roadSpeed = 180 + ratio * 900;
     this.roadScroll += roadSpeed * dt;
     if (!World3D.active) this.drawGround();
     for (const t of this.trees) {
@@ -1776,7 +1855,13 @@ class GameScene extends Phaser.Scene {
     fb.fillRoundedRect(bx, by, fw, bh - 8, (bh - 8) / 2);
     fb.fillStyle(0xffffff, 0.3);
     fb.fillRoundedRect(bx + 8, by + 4, Math.max(0, fw - 16), 8, 4);
+    const oc = this.s.overclock > 0;
     this.speedText.setText('x' + eff.toFixed(1));
+    this.speedLabel.setText(oc ? 'OVERCLOCK!' : 'SPEED').setColor(oc ? '#4fe0ff' : '#ffffff');
+    this.multText.setText('SCORE x' + this.scoreMult());
+    // Screen edges glow from x4 up, and pulse hard during OVERCLOCK.
+    this.edgeGlow.setTint(oc ? 0x4fe0ff : 0xff8a3c);
+    this.edgeGlow.setAlpha(oc ? 0.75 + 0.25 * Math.sin(this.elapsed * 14) : clamp((ratio - 0.7) / 0.3, 0, 1) * 0.6);
     this.speedText.setScale(1 + ratio * 0.12 + (this.s.surgeTimer > 0 ? 0.1 : 0));
 
     // Top-left cluster.

@@ -61,7 +61,7 @@ class GameOverScene extends Phaser.Scene {
       textStyle(20, '#c9d6d2', { strokeThickness: 4 })).setOrigin(0.5));
 
     const cards = [
-      ['TOP FIRE RATE', 'x' + r.topSpeed.toFixed(1), '#4fc3ff'],
+      ['TOP SPEED', 'x' + r.topSpeed.toFixed(1), '#4fc3ff'],
       ['BIGGEST SQUAD', String(r.maxSquad), COLORS.text],
       ['WAVE REACHED', String(r.wave), '#f2c14e'],
       ['HORDE SLAIN', String(r.kills), COLORS.text],

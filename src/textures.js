@@ -206,6 +206,17 @@ function makeTextures(scene) {
     g.fillCircle(28, 28, 5);
   });
 
+  // Screen-edge glow for high speed: clear in the middle, bright at the edges.
+  const eg = scene.textures.createCanvas('edgeglow', 180, 320);
+  const ex = eg.getContext();
+  const grad = ex.createRadialGradient(90, 160, 60, 90, 160, 200);
+  grad.addColorStop(0, 'rgba(255,255,255,0)');
+  grad.addColorStop(0.55, 'rgba(255,255,255,0)');
+  grad.addColorStop(1, 'rgba(255,255,255,0.9)');
+  ex.fillStyle = grad;
+  ex.fillRect(0, 0, 180, 320);
+  eg.refresh();
+
   bake('fog', W, 360, (g) => {
     for (let i = 0; i < 36; i++) {
       g.fillStyle(0x0b1412, 1 - i / 36);

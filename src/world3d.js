@@ -616,10 +616,14 @@ const World3D = {
       m.userData.inner.lookAt(this.camera.position);
     }
     m.userData.shadow.position.y = -lift + 0.03;
-    const flash = o.hitFlash > 0 || (o.isBoss && o.immune);
-    if (flash !== m.userData.flashing) {
-      m.userData.flashing = flash;
-      const c = o.immune ? 0x2f7fb0 : (kind === 'knight' || kind === 'champion' ? 0xc8201a : 0xffffff);
+    const unit = kind === 'knight' || kind === 'champion';
+    let c = 0;
+    if (o.isBoss && o.immune) c = 0x2f7fb0;
+    else if (o.hitFlash > 0) c = unit ? 0xc8201a : 0xffffff;
+    else if (unit && o.glow) c = 0x0b4a68;
+    const flash = c !== 0;
+    if (c !== m.userData.flashing) {
+      m.userData.flashing = c;
       m.userData.mats.forEach((mt) => {
         if (mt.emissive) mt.emissive.setHex(flash ? c : (mt.userData.baseEmissive || 0));
         else if (m.userData.billboard) mt.color.setHex(flash ? 0xff9090 : 0xffffff);
@@ -643,6 +647,10 @@ const World3D = {
   // road and forest scrolling, the chosen captain at the front.
   showcase(scene, t, captain) {
     if (!this.active) return;
+    if (this.camera.fov !== 48) {
+      this.camera.fov = 48;
+      this.camera.updateProjectionMatrix();
+    }
     this.fitCanvas(scene.game.canvas);
     const n = 9;
     if (!this.show) this.show = [];
@@ -717,6 +725,13 @@ const World3D = {
     });
 
     this.syncGates(g);
+    // The camera widens a little as speed climbs, so the road rushes past.
+    const sr = clamp((g.effSpeed() - 1) / (TUNING.maxSpeed - 1), 0, 1);
+    const fov = 48 + sr * 7 + (g.s.overclock > 0 ? 3 : 0);
+    if (Math.abs(this.camera.fov - fov) > 0.01) {
+      this.camera.fov += (fov - this.camera.fov) * 0.06;
+      this.camera.updateProjectionMatrix();
+    }
     this.drawDecals(g.decals || []);
     this.renderer.render(this.scene, this.camera);
   },
