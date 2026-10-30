@@ -516,6 +516,12 @@ const World3D = {
   sync(g) {
     if (!this.active) return;
     this.frame++;
+    // On a slow phone, drop the 3D resolution once to keep the frame rate up.
+    if (this.frame % 180 === 0 && !this.lowRes && g.game.loop.actualFps < 45 && this.renderer.getPixelRatio() > 1) {
+      this.lowRes = true;
+      this.renderer.setPixelRatio(1);
+      this.renderer.setSize(W, H, false);
+    }
     const t = g.elapsed;
     const pc = g.game.canvas;
     const c = this.canvas;
