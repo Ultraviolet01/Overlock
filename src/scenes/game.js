@@ -1062,9 +1062,13 @@ class GameScene extends Phaser.Scene {
     if (!o.hpText) {
       o.hpText = this.add.text(0, 0, '', textStyle(30, '#ffffff', { fontStyle: 'italic' })).setOrigin(0.5).setDepth(35);
     }
+    if (o.isBarrel && !o.hpText.barrelStyle) {
+      o.hpText.barrelStyle = true;
+      o.hpText.setFontSize(44).setColor('#7fe8ff').setStroke('#0a0f0e', 8);
+    }
     if (World3D.active) {
       y = o.y;
-      o.hpText.h3 = (MODEL_SIZE[o.def ? o.def.key : 'barrel'] || 1) * 100 + 30;
+      o.hpText.h3 = o.isBarrel ? 150 : (MODEL_SIZE[o.def ? o.def.key : 'barrel'] || 1) * 100 + 30;
     }
     o.hpText.setVisible(true).setPosition(o.x, y).setText(String(Math.max(1, Math.ceil(o.hp))));
   }
@@ -1157,13 +1161,16 @@ class GameScene extends Phaser.Scene {
     }
     const fall = TUNING.gateFall * 1.15 * (1 + (this.s.wave - 1) * 0.04);
     const list = this.barrels.getChildren();
+    const bar = this.barrelBar || (this.barrelBar = this.add.graphics().setDepth(34));
+    bar.clear();
     for (let i = 0; i < list.length; i++) {
       const b = list[i];
       if (!b.active) {
         if (b.hpText) b.hpText.setVisible(false);
         continue;
       }
-      this.hpTag(b, b.y + 4);
+      this.hpTag(b, b.y - 100);
+      this.drawBarrelBar(bar, b);
       b.setVelocity(0, fall);
       b.setAngle(90 + Math.sin(this.elapsed * 4 + b.x) * 6);
       this.applyHitFlash(b);
@@ -1175,6 +1182,26 @@ class GameScene extends Phaser.Scene {
           b.disableBody(true, true);
         }
       }
+    }
+  }
+
+  // A health bar over the barrel that drains as it is shot.
+  drawBarrelBar(g, b) {
+    const p = World3D.active ? project(b.x, b.y, 112) : project(b.x, b.y - 66);
+    const w = 120 * p.s;
+    const h = 16 * p.s;
+    const x = p.x - w / 2;
+    const y = p.y - h / 2;
+    const ratio = clamp(b.hp / b.maxHp, 0, 1);
+    g.fillStyle(0x0a0f0e, 0.9);
+    g.fillRoundedRect(x - 3, y - 3, w + 6, h + 6, h / 2 + 3);
+    g.fillStyle(0x1b2a2e, 1);
+    g.fillRoundedRect(x, y, w, h, h / 2);
+    if (ratio > 0.02) {
+      g.fillStyle(0x4fe0ff, 1);
+      g.fillRoundedRect(x, y, Math.max(h, w * ratio), h, h / 2);
+      g.fillStyle(0xffffff, 0.35);
+      g.fillRoundedRect(x + 2, y + 2, Math.max(h, w * ratio) - 4, h * 0.35, h * 0.2);
     }
   }
 
