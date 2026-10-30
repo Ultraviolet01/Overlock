@@ -527,6 +527,7 @@ class GameScene extends Phaser.Scene {
 
   setSquad(n, silent) {
     const prev = this.s.squad;
+    if (!silent && n < prev) this.wizardsFall(prev - Math.max(0, Math.round(n)));
     this.s.squad = clamp(Math.round(n), 0, TUNING.squadCap);
     this.s.maxSquad = Math.max(this.s.maxSquad, this.s.squad);
     this.squadLabel.setText(String(this.s.squad));
@@ -546,6 +547,26 @@ class GameScene extends Phaser.Scene {
       }
     }
     if (this.s.squad <= 0) this.gameOver();
+  }
+
+  // Lost wizards fall over in red and fade, and the whole squad flashes red,
+  // so every hit reads clearly even when merging hides the count change.
+  wizardsFall(lost) {
+    const alive = this.knights.slice(0, this.units).filter((k) => k.visible);
+    if (!alive.length) return;
+    alive.forEach((k) => { k.hitFlash = 0.3; });
+    const n = Math.min(lost, 10);
+    for (let i = 0; i < n; i++) {
+      const k = alive[(i * 7) % alive.length];
+      const p = project(k.x + (Math.random() - 0.5) * 30, k.y + (Math.random() - 0.5) * 16);
+      const side = Math.random() < 0.5 ? -1 : 1;
+      const body = this.add.image(p.x, p.y, k.isChampion ? 'champion' : 'knight')
+        .setOrigin(0.5, 1).setScale((k.isChampion ? UNIT.champion : UNIT.knight).scale * p.s)
+        .setTintFill(0xe0413a).setDepth(45);
+      this.tweens.add({ targets: body, angle: side * 85, x: p.x + side * 26 * p.s, duration: 320, delay: i * 40, ease: 'Quad.easeIn' });
+      this.tweens.add({ targets: body, alpha: 0, y: p.y + 10, duration: 380, delay: 420 + i * 40, onComplete: () => body.destroy() });
+      this.explode(this.burstRed, 8, k.x, k.y - 20);
+    }
   }
 
   // Every MERGE_SIZE knights merge into one champion, so big squads stay readable.
@@ -789,6 +810,12 @@ class GameScene extends Phaser.Scene {
       const ty = LINE_Y + kn.off.y + Math.sin(this.elapsed * bobRate + kn.phase) * 3;
       kn.x += (tx - kn.x) * k;
       kn.y += (ty - kn.y) * k;
+      if (kn.hitFlash > 0) {
+        kn.hitFlash -= dt;
+        kn.setTint(0xff5a50);
+      } else if (kn.isTinted) {
+        kn.clearTint();
+      }
     }
     const spread = this.squadSpread();
     if (World3D.active) {

@@ -616,7 +616,7 @@ const World3D = {
     const flash = o.hitFlash > 0 || (o.isBoss && o.immune);
     if (flash !== m.userData.flashing) {
       m.userData.flashing = flash;
-      const c = o.immune ? 0x2f7fb0 : 0xffffff;
+      const c = o.immune ? 0x2f7fb0 : (kind === 'knight' || kind === 'champion' ? 0xc8201a : 0xffffff);
       m.userData.mats.forEach((mt) => {
         if (mt.emissive) mt.emissive.setHex(flash ? c : (mt.userData.baseEmissive || 0));
         else if (m.userData.billboard) mt.color.setHex(flash ? 0xff9090 : 0xffffff);
