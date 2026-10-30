@@ -29,28 +29,6 @@ function makeTextures(scene) {
     g.fillCircle(10, 13, 2);
   });
 
-  // Rune barrel: break it for an upgrade before it rolls into the squad.
-  bake('barrel', 80, 88, (g) => {
-    g.fillStyle(COLORS.knight, 0.18);
-    g.fillCircle(40, 44, 40);
-    g.fillStyle(0x0b0b0b, 1);
-    g.fillRoundedRect(10, 6, 60, 76, 16);
-    g.fillStyle(0x6b4426, 1);
-    g.fillRoundedRect(14, 10, 52, 68, 13);
-    g.fillStyle(0x845733, 1);
-    g.fillRect(24, 10, 8, 68);
-    g.fillRect(48, 10, 6, 68);
-    g.fillStyle(0x2b2f33, 1);
-    g.fillRect(14, 20, 52, 7);
-    g.fillRect(14, 61, 52, 7);
-    g.fillStyle(COLORS.knight, 1);
-    g.fillTriangle(40, 30, 50, 44, 40, 58);
-    g.fillTriangle(40, 30, 30, 44, 40, 58);
-    g.fillStyle(0xffffff, 1);
-    g.fillTriangle(40, 37, 44, 44, 40, 51);
-    g.fillTriangle(40, 37, 36, 44, 40, 51);
-  });
-
   // Forest road, tiled vertically and scrolled to show speed.
   bake('road', W, 512, (g) => {
     g.fillStyle(0x0d1a15, 1);

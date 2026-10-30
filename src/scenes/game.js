@@ -1135,8 +1135,12 @@ class GameScene extends Phaser.Scene {
     const b = this.barrels.get(x, VIEW.far - 40, 'barrel');
     if (!b) return;
     b.enableBody(true, x, VIEW.far - 40, true, true);
-    b.setCircle(34, b.width / 2 - 34, b.height / 2 - 34);
+    b.setCircle(44, b.width / 2 - 44, b.height / 2 - 44);
     b.setDepth(9).clearTint().setScale(1).setAngle(0);
+    if (!this.seen.barrel) {
+      this.seen.barrel = true;
+      this.notice('RUNE BARREL', 'Shoot it open for a reward');
+    }
     b.isBarrel = true;
     b.isBoss = false;
     b.hp = b.maxHp = 28 * this.waveScale();
@@ -1161,7 +1165,7 @@ class GameScene extends Phaser.Scene {
       }
       this.hpTag(b, b.y + 4);
       b.setVelocity(0, fall);
-      b.setAngle(Math.sin(this.elapsed * 4 + b.x) * 8);
+      b.setAngle(90 + Math.sin(this.elapsed * 4 + b.x) * 6);
       this.applyHitFlash(b);
       if (b.y >= LINE_Y - 40) {
         if (Math.abs(b.x - this.squadX) < this.squadSpread() + 60) {

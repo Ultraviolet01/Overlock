@@ -11,7 +11,7 @@ const U = 0.01; // 3D units per world pixel
 const MODEL_SIZE = {
   knight: 1.3, champion: 1.75, walker: 1.35, sprinter: 0.95, brute: 2.0,
   wraith: 1.4, bloater: 1.55, shield: 1.5, summoner: 1.6, splitter: 1.0, slimelet: 0.5,
-  boss: 3.2, colossus: 3.3, brood: 2.6, wraithking: 3.4, barrel: 0.75,
+  boss: 3.2, colossus: 3.3, brood: 2.6, wraithking: 3.4, barrel: 1.15,
 };
 
 // Natural height of each hand-built model before scaling.
@@ -37,7 +37,7 @@ const GAIT = {
 };
 
 // AI-generated textured models; every other kind is built from shapes below.
-const GLB_MODELS = ['knight', 'walker', 'sprinter', 'brute', 'boss', 'colossus', 'brood', 'wraithking'];
+const GLB_MODELS = ['knight', 'walker', 'sprinter', 'brute', 'boss', 'colossus', 'brood', 'wraithking', 'barrel'];
 
 // Enemies that have Higgsfield PNGs but no GLB; rendered as billboards.
 const BILLBOARD_MODELS = ['wraith', 'bloater', 'shield', 'summoner', 'splitter'];
@@ -263,6 +263,7 @@ const World3D = {
     if (!m) {
       m = this.build(kind);
       m.userData.kind = kind;
+      if (kind === 'barrel') this.addBarrelGlow(m);
       const sh = new THREE.Mesh(this.shadowGeo, this.shadowMat);
       sh.rotation.x = -Math.PI / 2;
       sh.renderOrder = -1;
@@ -320,6 +321,7 @@ const World3D = {
 
   build(kind) {
     if (kind === 'champion' && this.templates.knight) return this.buildChampion();
+    if (kind === 'barrel' && this.templates.barrel) return this.buildRollingBarrel();
     if (this.templates[kind]) {
       const g = this.templates[kind].clone(true);
       g.userData.inner = g.children[0];
@@ -693,7 +695,11 @@ const World3D = {
     g.barrels.getChildren().forEach((b) => {
       if (!b.active) return;
       const m = this.place(b, 'barrel', t, 0);
-      m.rotation.x = -t * 4;
+      if (m.userData.roll) m.userData.roll.rotation.x = b.y * U / m.userData.rollR;
+      const pulse = 0.5 + 0.5 * Math.sin(t * 6);
+      m.userData.glow.scale.setScalar(1 + pulse * 0.25);
+      m.userData.glow.material.opacity = 0.5 + pulse * 0.4;
+      m.userData.beam.material.opacity = 0.18 + pulse * 0.12;
     });
     // Hide models whose owner is gone this frame.
     this.live.forEach((m) => {
@@ -712,6 +718,40 @@ const World3D = {
     this.syncGates(g);
     this.drawDecals(g.decals || []);
     this.renderer.render(this.scene, this.camera);
+  },
+
+  // The barrel lies on its side across the road and rolls toward the squad.
+  buildRollingBarrel() {
+    const g = this.templates.barrel.clone(true);
+    const inner = g.children[0];
+    const size = new THREE.Box3().setFromObject(g).getSize(new THREE.Vector3());
+    g.remove(inner);
+    inner.position.y -= size.y / 2;
+    const tilt = new THREE.Group();
+    tilt.rotation.z = Math.PI / 2;
+    tilt.add(inner);
+    const r = Math.max(size.x, size.z) / 2;
+    const roll = new THREE.Group();
+    roll.position.y = r;
+    roll.add(tilt);
+    g.add(roll);
+    g.userData.roll = roll;
+    g.userData.rollR = r;
+    return g;
+  },
+
+  // A pulsing cyan ring on the road and a soft beam of light, so the barrel
+  // reads as a target from across the battlefield.
+  addBarrelGlow(g) {
+    const add = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.72, 40), new THREE.MeshBasicMaterial(Object.assign({ color: 0x4fe0ff, side: THREE.DoubleSide }, add)));
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.05;
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.55, 3.2, 20, 1, true), new THREE.MeshBasicMaterial(Object.assign({ color: 0x4fe0ff, side: THREE.DoubleSide }, add)));
+    beam.position.y = 1.6;
+    g.add(ring, beam);
+    g.userData.glow = ring;
+    g.userData.beam = beam;
   },
 
   // Last War style gates: an upright glass panel between two posts with a
