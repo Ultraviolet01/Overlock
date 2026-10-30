@@ -1031,6 +1031,9 @@ class GameScene extends Phaser.Scene {
   updateSpawning(dt) {
     this.spawnTimer -= dt;
     if (this.spawnTimer > 0) return;
+    // Keep the road readable (and phones smooth): later waves get tougher
+    // enemies rather than an endless swarm.
+    if (this.enemies.countActive() >= TUNING.maxEnemies) return;
     const w = this.s.wave;
     const base = Math.max(0.12, 1.0 / (1 + (w - 1) * 0.35));
     this.spawnTimer = base * (this.s.bossActive ? 2.6 : 1) * (0.7 + Math.random() * 0.6);
@@ -1049,7 +1052,7 @@ class GameScene extends Phaser.Scene {
       this.spawnEnemy(type, x);
     }
     // Later waves send extra enemies alongside each spawn.
-    const extra = Math.floor(w / TUNING.extraEvery);
+    const extra = Math.min(2, Math.floor(w / TUNING.extraEvery));
     for (let i = 0; i < extra; i++) this.spawnEnemy(w >= 3 && Math.random() < 0.4 ? 'sprinter' : 'walker', 130 + Math.random() * (W - 260));
   }
 
