@@ -58,7 +58,8 @@ const MERGE_SIZE = 10;         // this many wizards merge into one archmage
 const MAX_UNITS = 40;          // sprites drawn for the squad
 const MAX_CHAMPIONS = 30;
 const SQUAD_MIN_X = 110;
-const CARD_W = 340;
+const CARD_W = 290;
+const GATE_GAP = 60;           // open space between the two gates of a row
 const CARD_H = 180;
 const SLAM_HALF_W = 95;
 const MAX_SQUAD_RADIUS = 120; // keeps a big crowd narrow enough to dodge
@@ -896,7 +897,7 @@ class GameScene extends Phaser.Scene {
         if (row.done || b.y > row.y + CARD_H / 2 || b.y < row.y - CARD_H / 2) continue;
         const card = row.cards[b.x < W / 2 ? 0 : 1];
         // Bolts fly on through the gate, counting once per gate on the way.
-        if (card && card.shootable && b.gateRow !== row) {
+        if (card && card.shootable && b.gateRow !== row && Math.abs(b.x - card.x) <= CARD_W / 2) {
           b.gateRow = row;
           this.hitCard(card);
         }
@@ -1497,31 +1498,31 @@ class GameScene extends Phaser.Scene {
     return { kind };
   }
 
+  // Red gates take a big random bite out of the squad. Shooting them pushes
+  // the number up until it crosses zero and turns into a gold gate.
   badGate() {
     const w = this.s.wave;
-    const kind = weighted([['add', 45], ['div', 25], ['trap', 30]]);
-    if (kind === 'add') return { kind, value: -Math.round(2 + w + Math.random() * (2 + w)) };
-    if (kind === 'div') return { kind, value: 2, prog: 0 };
-    return { kind, pct: 40, prog: 0 };
+    return { kind: 'add', value: -Math.round(10 + w * 3 + Math.random() * (15 + w * 4)) };
   }
 
   spawnGateRow() {
     const a = this.goodGate();
     let b = Math.random() < 0.6 ? this.badGate() : this.goodGate();
-    // Never show two gates with the same kind + subtitle combo in one row.
+    // Never show two gates of the same kind and color in one row.
+    const look = (g) => g.kind + (g.value < 0 ? '-' : '+');
     let tries = 0;
-    while (b.kind === a.kind && tries < 6) {
+    while (look(b) === look(a) && tries < 6) {
       b = Math.random() < 0.6 ? this.badGate() : this.goodGate();
       tries++;
     }
     const picks = Phaser.Utils.Array.Shuffle([a, b]);
     const row = { y: VIEW.far - CARD_H / 2, cards: [], done: false };
     picks.forEach((p, i) => {
-      const x = i === 0 ? W / 2 - CARD_W / 2 - 4 : W / 2 + CARD_W / 2 + 4;
+      const x = W / 2 + (i === 0 ? -1 : 1) * (CARD_W + GATE_GAP) / 2;
       const c = this.add.container(x, row.y).setDepth(5);
       c.gate = p;
-      // Shooting raises +/- cards, and makes the red divide and trap cards worse.
-      c.shootable = p.kind === 'add' || p.kind === 'div' || p.kind === 'trap';
+      // Shooting raises the number on +/- gates.
+      c.shootable = p.kind === 'add';
       c.h3 = 0;
       c.startValue = p.value || 0;
       c.bg = this.add.graphics();
@@ -1542,9 +1543,7 @@ class GameScene extends Phaser.Scene {
         return { text: (v >= 0 ? '+' : '') + v, sub: v > 0 ? 'ADD WIZARDS' : 'LOSE WIZARDS', color: v > 0 ? COLORS.gold : COLORS.bad, icon: 'knight' };
       }
       case 'mul': return { text: 'x' + g.value, sub: 'MULTIPLY WIZARDS', color: COLORS.gold, icon: 'knight' };
-      case 'div': return { text: '/' + g.value, sub: 'DIVIDE WIZARDS', color: COLORS.bad, icon: 'skull' };
       case 'fire': return { text: 'x2', sub: 'DOUBLE FIRE RATE', color: COLORS.speedGate, icon: 'icon_flame' };
-      case 'trap': return { text: '-' + g.pct + '%', sub: 'CUT FIRE RATE', color: COLORS.bad, icon: 'icon_flame' };
       case 'bolt': return { text: '+50%', sub: 'SPELL POWER UP', color: COLORS.speedGate, icon: 'bolt' };
       case 'slow': return { text: 'SLOW', sub: 'FREEZE HORDE 5s', color: COLORS.speedGate, icon: 'skull' };
     }
@@ -1576,14 +1575,11 @@ class GameScene extends Phaser.Scene {
   hitCard(c) {
     const g = c.gate;
     if (g.kind === 'add') {
-      const cap = c.startValue + 30 + this.s.wave * 3;
-      g.value = Math.min(cap, g.value + 0.34);
-    } else if (g.kind === 'div') {
-      g.prog++;
-      g.value = Math.min(5, 2 + Math.floor(g.prog / 30));
-    } else if (g.kind === 'trap') {
-      g.prog++;
-      g.pct = Math.min(80, 40 + Math.floor(g.prog / 12) * 5);
+      // Big red numbers climb faster per hit, so they can be turned around.
+      const start = c.startValue;
+      const step = start < 0 ? 0.34 + -start * 0.012 : 0.34;
+      const cap = start < 0 ? -start * 0.5 + 5 + this.s.wave * 2 : start + 30 + this.s.wave * 3;
+      g.value = Math.min(cap, g.value + step);
     }
     const info = this.cardInfo(g);
     if (info.text !== c.shownText) {
@@ -1592,7 +1588,7 @@ class GameScene extends Phaser.Scene {
       this.tweens.add({ targets: c.label, scale: 1, duration: 120 });
       Sfx.gateTick();
     }
-    this.explode(g.kind === 'add' ? this.burstBlue : this.burstRed, 2, c.x + (Math.random() - 0.5) * 120, c.y + CARD_H / 2 - 10);
+    this.explode(g.value >= 0 ? this.burstBlue : this.burstRed, 2, c.x + (Math.random() - 0.5) * 120, c.y + CARD_H / 2 - 10);
   }
 
   updateGates(dt) {
@@ -1640,19 +1636,9 @@ class GameScene extends Phaser.Scene {
         msg = 'x' + g.value;
         this.setSquad(s.squad * g.value);
         break;
-      case 'div':
-        good = false;
-        msg = '÷' + g.value;
-        this.setSquad(Math.ceil(s.squad / g.value));
-        break;
       case 'fire':
         msg = 'FIRE RATE x2';
         s.speed = Math.min(TUNING.maxSpeed, s.speed * 2);
-        break;
-      case 'trap':
-        good = false;
-        msg = 'FIRE RATE -' + g.pct + '%';
-        s.speed = Math.max(1, s.speed * (1 - g.pct / 100));
         break;
       case 'bolt':
         msg = 'SPELL POWER +50%';

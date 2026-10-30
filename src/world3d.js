@@ -758,7 +758,7 @@ const World3D = {
   // crossbar, standing on the road. The value sign faces the camera so it
   // stays readable from above.
   buildGate() {
-    const w = 3.3;
+    const w = 2.3;
     const h = 1.7;
     const g = new THREE.Group();
     const glassMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false });

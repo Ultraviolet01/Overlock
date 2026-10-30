@@ -289,9 +289,9 @@ function openHelp(scene, onClose) {
   const rows = [
     [() => scene.add.image(0, 0, 'knight').setScale(0.42), 'STEER', 'Drag left or right. Your wizards cast spells on their own.'],
     [() => scene.add.image(0, 0, 'icon_flame').setScale(1.1), 'FIRE RATE IS SPEED', 'Kills speed it up. Bites slow it down.'],
-    [() => miniCard(scene, 0, 0, '+8', COLORS.gold), 'GOLD CARDS', 'Walk through to add or multiply wizards. Shoot them to raise the number.'],
-    [() => miniCard(scene, 0, 0, '÷2', COLORS.bad), 'RED CARDS', 'Avoid them. Shooting makes them worse.'],
-    [() => scene.add.image(0, 0, 'barrel').setScale(0.9), 'RUNE BARRELS', 'Break one for an upgrade, or it crashes into you.'],
+    [() => miniCard(scene, 0, 0, '+8', COLORS.gold), 'GOLD GATES', 'Walk through to add or multiply wizards. Shoot them to raise the number.'],
+    [() => miniCard(scene, 0, 0, '-30', COLORS.bad), 'RED GATES', 'They take wizards. Shoot them: the number climbs, turns gold and gives wizards.'],
+    [() => scene.add.image(0, 0, 'barrel').setScale(0.75), 'RUNE BARRELS', 'Break one for an upgrade, or it crashes into you.'],
     [() => scene.add.image(0, 0, 'champion').setScale(0.36), 'ARCHMAGES', 'Every 10 wizards merge into one archmage.'],
     [() => scene.add.image(0, 0, 'boss').setScale(0.24), 'BOSSES', 'Every 5th wave: the Horror, Bone Colossus, Brood Mother, then the Wraith King.'],
   ];

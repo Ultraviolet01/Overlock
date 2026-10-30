@@ -9,10 +9,9 @@ A portrait, one-thumb horde shooter built for Slapjam AI 2. The jam theme is **S
 - Every zombie that reaches your line kills knights and slows your fire rate.
 - Cards fall toward you. Walk through one to take its effect:
   - Gold cards change the squad: `+8`, `x2`, `x3`.
-  - Red cards hurt: `-6`, `÷2`, or fire rate `-40%`.
+  - Red gates take wizards: a big random number like `-30`.
   - Teal cards boost speed: fire rate `x2`, bolt speed `+50%`, or horde slow for 5 seconds.
-- Shoot the `+` and `-` cards to raise their number. A higher fire rate pumps them up faster, and a red `-6` can be turned into a gold `+4`.
-- Don't shoot the red `÷` and fire rate trap cards. Shooting makes them worse (`÷2` becomes `÷3`, `-40%` becomes `-50%`).
+- Shoot the `+` and `-` gates to raise their number. A higher fire rate pumps them up faster. A red `-30` climbs toward zero, turns gold, and then gives wizards.
 - Every 10 knights merge into one champion, so a squad of hundreds stays readable.
 - Rune barrels roll down a lane. Shoot one open for piercing bolts, extra bolt damage or more knights. If you don't break it and it reaches your squad, it crashes into it.
 - The horde speeds up every 15 seconds and new enemy types join as the waves climb. The first time one appears, its name and a tip show on screen.
