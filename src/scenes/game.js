@@ -1418,7 +1418,15 @@ class GameScene extends Phaser.Scene {
   }
 
   spawnGateRow() {
-    const picks = Phaser.Utils.Array.Shuffle([this.goodGate(), Math.random() < 0.6 ? this.badGate() : this.goodGate()]);
+    const a = this.goodGate();
+    let b = Math.random() < 0.6 ? this.badGate() : this.goodGate();
+    // Never show two gates with the same kind + subtitle combo in one row.
+    let tries = 0;
+    while (b.kind === a.kind && tries < 6) {
+      b = Math.random() < 0.6 ? this.badGate() : this.goodGate();
+      tries++;
+    }
+    const picks = Phaser.Utils.Array.Shuffle([a, b]);
     const row = { y: VIEW.far - CARD_H / 2, cards: [], done: false };
     picks.forEach((p, i) => {
       const x = i === 0 ? W / 2 - CARD_W / 2 - 4 : W / 2 + CARD_W / 2 + 4;
@@ -1429,9 +1437,10 @@ class GameScene extends Phaser.Scene {
       c.h3 = 0;
       c.startValue = p.value || 0;
       c.bg = this.add.graphics();
+      c.icon = this.add.image(-CARD_W / 2 + 30, -CARD_H / 2 + 28, 'dot').setScale(0.7);
       c.label = this.add.text(0, -16, '', textStyle(72, '#ffffff', { fontStyle: 'italic' })).setOrigin(0.5);
       c.sub = this.add.text(0, 54, '', textStyle(22, '#ffffff', { strokeThickness: 4 })).setOrigin(0.5);
-      c.add([c.bg, c.label, c.sub]);
+      c.add([c.bg, c.icon, c.label, c.sub]);
       this.drawCard(c);
       row.cards.push(c);
     });
@@ -1442,14 +1451,14 @@ class GameScene extends Phaser.Scene {
     switch (g.kind) {
       case 'add': {
         const v = Math.round(g.value);
-        return { text: (v >= 0 ? '+' : '') + v, sub: 'WIZARDS', color: v > 0 ? COLORS.gold : COLORS.bad };
+        return { text: (v >= 0 ? '+' : '') + v, sub: v > 0 ? 'ADD WIZARDS' : 'LOSE WIZARDS', color: v > 0 ? COLORS.gold : COLORS.bad, icon: 'knight' };
       }
-      case 'mul': return { text: 'x' + g.value, sub: 'WIZARDS', color: COLORS.gold };
-      case 'div': return { text: '÷' + g.value, sub: 'WIZARDS', color: COLORS.bad };
-      case 'fire': return { text: 'x2', sub: 'FIRE RATE', color: COLORS.speedGate };
-      case 'trap': return { text: '-' + g.pct + '%', sub: 'FIRE RATE', color: COLORS.bad };
-      case 'bolt': return { text: '+50%', sub: 'SPELL POWER', color: COLORS.speedGate };
-      case 'slow': return { text: 'SLOW', sub: 'HORDE 5s', color: COLORS.speedGate };
+      case 'mul': return { text: 'x' + g.value, sub: 'MULTIPLY WIZARDS', color: COLORS.gold, icon: 'knight' };
+      case 'div': return { text: '/' + g.value, sub: 'DIVIDE WIZARDS', color: COLORS.bad, icon: 'skull' };
+      case 'fire': return { text: 'x2', sub: 'DOUBLE FIRE RATE', color: COLORS.speedGate, icon: 'icon_flame' };
+      case 'trap': return { text: '-' + g.pct + '%', sub: 'CUT FIRE RATE', color: COLORS.bad, icon: 'icon_flame' };
+      case 'bolt': return { text: '+50%', sub: 'SPELL POWER UP', color: COLORS.speedGate, icon: 'bolt' };
+      case 'slow': return { text: 'SLOW', sub: 'FREEZE HORDE 5s', color: COLORS.speedGate, icon: 'skull' };
     }
     return { text: '?', sub: '', color: COLORS.gold };
   }
@@ -1460,14 +1469,17 @@ class GameScene extends Phaser.Scene {
     const hw = CARD_W / 2;
     const hh = CARD_H / 2;
     g.clear();
-    g.fillStyle(info.color, 0.38);
+    g.fillStyle(0x0a0f0e, 0.7);
+    g.fillRoundedRect(-hw - 3, -hh - 3, CARD_W + 6, CARD_H + 6, 16);
+    g.fillStyle(info.color, 0.42);
     g.fillRoundedRect(-hw, -hh, CARD_W, CARD_H, 14);
-    g.fillStyle(info.color, 0.18);
-    g.fillRoundedRect(-hw, -hh, CARD_W, CARD_H, 14);
-    g.lineStyle(3, 0xffffff, 0.5);
+    g.lineStyle(4, info.color, 0.9);
     g.strokeRoundedRect(-hw, -hh, CARD_W, CARD_H, 14);
-    g.fillStyle(0xffffff, 0.12);
+    g.fillStyle(0xffffff, 0.14);
     g.fillRoundedRect(-hw + 6, -hh + 5, CARD_W - 12, CARD_H * 0.35, 10);
+    if (c.icon && info.icon) {
+      c.icon.setTexture(info.icon).setScale(info.icon === 'knight' ? 0.32 : 0.55);
+    }
     c.label.setText(info.text);
     c.sub.setText(info.sub);
     c.shownText = info.text;
