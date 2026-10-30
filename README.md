@@ -53,6 +53,7 @@ A portrait, one-thumb horde shooter built for Slapjam AI 2. The jam theme is **S
 - **How to play:** an illustrated guide to steering, fire rate, cards, barrels, champions and the horror. It opens on the first launch.
 - **Settings:** music and sound effect volume, vibration, screen shake, reset best run, and the version number. Reachable from the title and the pause menu.
 - **Opening drop (Last War style):** each run starts with a cursed airship hovering over the road. The knights parachute down to their spot one by one, the airship flies off, and a swipe hint with a sliding hand shows for the first three runs.
+- **3D battlefield:** the road, curbs, pine forest, lighting, shadows and every character are real 3D (three.js), seen from behind and above the squad like Last War. The menus, HUD, gates, bolts and numbers are drawn on top. If a device has no WebGL, the game falls back to the 2D battlefield.
 - **Camera (Last War style):** the battle is seen from behind and above the squad, looking down the road at an angle. The road narrows toward the top and leans slightly, far things are small, near things are big, and pine forest lines both sides. The squad stands about two thirds of the way down the screen.
 - **In game (Last War style):** a small cluster in the top-left corner (captain portrait with the wave number, a wave progress bar, score and kill strips, and how many waves until the next horror), a small pause button top right, and a big fire rate meter at the bottom. During a boss, a huge outlined health number on a fat red bar. Gates are glassy panels with a big number, and brutes and barrels show their health right on them.
 - **Pause menu:** resume, how to play, settings, quit to title. The game also pauses by itself when you switch apps or tabs.
@@ -65,10 +66,11 @@ A portrait, one-thumb horde shooter built for Slapjam AI 2. The jam theme is **S
 
 ## Tech
 
-- Phaser 3.80.1, stored in `lib/` so the game needs no internet.
+- Phaser 3.80.1 for game logic, menus and HUD, and three.js r147 for the 3D battlefield, both stored in `lib/` so the game needs no internet.
 - Plain JavaScript, no build step.
 - Character art (knight, champion, cultist, crawler, brute, wraith, bloater, shield skeleton, necromancer, flesh slime, the four bosses, airship) was generated with AI (Higgsfield, Z Image model), then cut out and resized. The knights are drawn from behind, standing straight and holding their crossbows forward up the road, like Last War's soldiers. The files are in `assets/`.
-- Bolts, road, barrels and effects are drawn in code at startup, and all sound is made with WebAudio.
+- 3D models: the knight, cultist, crawler, brute and the Horror boss were turned into textured 3D models with AI (Higgsfield, SAM 3D) from the character art, in `assets/models/`. The champion, wraith, bloater, shield skeleton, necromancer, flesh slime, Bone Colossus, Brood Mother, Wraith King and rune barrels are built in code from 3D shapes (`src/world3d.js`).
+- Bolts, gates, effects and the 2D fallback are drawn in code at startup, and all sound is made with WebAudio.
 - Game size is 720 x 1280 and scales to fit any screen.
 - Font: Lilita One (SIL Open Font License, see `assets/fonts/`), bundled so it works offline.
 
@@ -106,7 +108,8 @@ python3 -m http.server 8000
 - `src/audio.js`: sound effects and the speed-linked music, with separate volumes.
 - `src/ui.js`: buttons, pop-up panels, sliders and toggles, plus the settings, how to play and pause panels.
 - `assets/`: AI-generated character sprites.
-- `src/textures.js`: draws the bolts, road, barrels and effects.
+- `src/world3d.js`: the 3D battlefield: camera, road, forest, lights, shadows, models and their walk cycles.
+- `src/textures.js`: draws the bolts, barrels and effects for the 2D layer.
 - `src/scenes/`: boot, title, game and game over screens.
 - `scripts/package.sh`: builds the itch.io zip.
 
@@ -114,4 +117,5 @@ python3 -m http.server 8000
 
 - Code: written with Claude Code.
 - Character art: generated with Higgsfield (Z Image).
+- 3D models: generated with Higgsfield (SAM 3D) from that art.
 - Sound and music: synthesized in code written with Claude Code.

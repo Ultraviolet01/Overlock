@@ -24,6 +24,8 @@
     }
     canvas {
       display: block;
+      position: relative;
+      z-index: 1;
     }
     @font-face {
       font-family: 'Lilita One';
@@ -35,10 +37,13 @@
 <body>
   <div id="game"></div>
   <script src="./lib/phaser.min.js"></script>
+  <script src="./lib/three.min.js"></script>
+  <script src="./lib/GLTFLoader.js"></script>
   <script src="./src/config.js"></script>
   <script src="./src/audio.js"></script>
   <script src="./src/ui.js"></script>
   <script src="./src/textures.js"></script>
+  <script src="./src/world3d.js"></script>
   <script src="./src/scenes/boot.js"></script>
   <script src="./src/scenes/title.js"></script>
   <script src="./src/scenes/game.js"></script>

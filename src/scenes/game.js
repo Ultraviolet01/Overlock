@@ -77,7 +77,9 @@ const VIEW = {
   near: 1320,      // world y at the bottom of the screen
 };
 
-function project(wx, wy) {
+// h is height above the road in world pixels; only the 3D camera uses it.
+function project(wx, wy, h) {
+  if (World3D.active) return World3D.project(wx, wy, h);
   const z = LINE_Y - wy;
   const s = VIEW.depth / (VIEW.depth + z);
   const y = VIEW.horizon + (VIEW.base - VIEW.horizon) * s;
@@ -161,11 +163,16 @@ class GameScene extends Phaser.Scene {
   // ---------------------------------------------------------------- setup
 
   createWorld() {
+    // In 3D, three.js draws the road, forest, models and shadows; the 2D
+    // versions below are the fallback when WebGL or the models are missing.
+    World3D.setActive(World3D.ready);
+    this.events.once('shutdown', () => World3D.setActive(false));
     this.ground = this.add.graphics().setDepth(0);
     this.shadowGfx = this.add.graphics().setDepth(4.5);
     this.roadScroll = 0;
+    this.decals = [];
     this.trees = [];
-    for (let i = 0; i < 26; i++) {
+    for (let i = 0; i < (World3D.active ? 0 : 26); i++) {
       const left = i % 2 === 0;
       const t = this.add.image(0, 0, 'tree').setOrigin(0.5, 0.95).setDepth(3);
       t.x = left ? -10 - Math.random() * 70 : W + 10 + Math.random() * 70;
@@ -201,13 +208,23 @@ class GameScene extends Phaser.Scene {
     list.length = 0;
     const sg = this.shadowGfx;
     sg.clear();
+    const hidden = this.hidden3d || (this.hidden3d = []);
+    hidden.length = 0;
+    const is3d = World3D.active;
+    if (is3d) World3D.sync(this);
     const add = (o, depthFromY, walker) => {
       if (!o || !o.visible) return;
+      // Drawn as a 3D model; hide the 2D sprite while Phaser draws.
+      if (is3d && depthFromY) {
+        hidden.push(o);
+        o.visible = false;
+        return;
+      }
       list.push(o);
       o._w = [o.x, o.y, o.scaleX, o.scaleY];
-      const p = project(o.x, o.y);
+      const p = project(o.x, o.y, (o.h3 || 0) + (is3d ? (o.lift || 0) : 0));
       o.x = p.x;
-      o.y = p.y - (o.lift || 0) * p.s;
+      o.y = is3d ? p.y : p.y - (o.lift || 0) * p.s;
       o.setScale(o._w[2] * p.s, o._w[3] * p.s);
       if (!depthFromY) return;
       o.setDepth(10 + (o._w[1] + 1000) / 10000);
@@ -246,6 +263,7 @@ class GameScene extends Phaser.Scene {
   }
 
   restoreAll() {
+    (this.hidden3d || []).forEach((o) => { o.visible = true; });
     const list = this.projected;
     if (!list) return;
     for (let i = 0; i < list.length; i++) {
@@ -599,6 +617,7 @@ class GameScene extends Phaser.Scene {
     if (s.over) return;
     this.updateBarrels(dt);
     if (s.over) return;
+    this.decals.length = 0;
     this.updateBoss(dt);
     if (s.over) return;
     this.updateGates(dt);
@@ -617,7 +636,7 @@ class GameScene extends Phaser.Scene {
     this.introActive = true;
     this.introT = 0;
     this.squadLabel.setVisible(false);
-    this.airship = this.add.image(W / 2, LINE_Y - 400, 'airship').setDepth(40).setScale(1.45);
+    this.airship = this.add.image(W / 2, LINE_Y - 400, 'airship').setDepth(40).setScale(World3D.active ? 0.85 : 1.45);
     this.airship.lift = 260;
     this.drops = [];
     for (let i = 0; i < this.units; i++) {
@@ -754,7 +773,12 @@ class GameScene extends Phaser.Scene {
       kn.y += (ty - kn.y) * k;
     }
     const spread = this.squadSpread();
-    this.squadLabel.setPosition(this.squadX, LINE_Y - 100 - spread * 0.55);
+    if (World3D.active) {
+      this.squadLabel.setPosition(this.squadX, LINE_Y - spread * 0.55);
+      this.squadLabel.h3 = 170;
+    } else {
+      this.squadLabel.setPosition(this.squadX, LINE_Y - 100 - spread * 0.55);
+    }
   }
 
   // ---------------------------------------------------------------- shooting
@@ -785,6 +809,7 @@ class GameScene extends Phaser.Scene {
       b.body.setSize(10, 30);
       b.setVelocity((Math.random() - 0.5) * 50, -vy);
       b.dmg = dmg;
+      b.h3 = 55;
       b.pierce = this.s.pierce;
       b.lastHit = null;
     }
@@ -893,8 +918,20 @@ class GameScene extends Phaser.Scene {
     return e;
   }
 
-  // A smaller announcement than a banner, for new enemy types.
+  // A smaller announcement than a banner, for new enemy types. Several in a
+  // row wait their turn instead of stacking.
   notice(title, sub) {
+    const now = this.time.now;
+    const at = Math.max(now, this.noticeFree || 0);
+    this.noticeFree = at + 2600;
+    if (at > now) {
+      this.time.delayedCall(at - now, () => this.showNotice(title, sub));
+      return;
+    }
+    this.showNotice(title, sub);
+  }
+
+  showNotice(title, sub) {
     const t = this.add.text(W / 2, 360, title, textStyle(44, '#ff8a7a', { fontStyle: 'italic' })).setOrigin(0.5).setDepth(58).setAlpha(0);
     const t2 = this.add.text(W / 2, 408, sub, textStyle(24, '#ffffff')).setOrigin(0.5).setDepth(58).setAlpha(0);
     this.tweens.add({ targets: [t, t2], alpha: 1, duration: 200 });
@@ -967,6 +1004,10 @@ class GameScene extends Phaser.Scene {
   hpTag(o, y) {
     if (!o.hpText) {
       o.hpText = this.add.text(0, 0, '', textStyle(30, '#ffffff', { fontStyle: 'italic' })).setOrigin(0.5).setDepth(35);
+    }
+    if (World3D.active) {
+      y = o.y;
+      o.hpText.h3 = (MODEL_SIZE[o.def ? o.def.key : 'barrel'] || 1) * 100 + 30;
     }
     o.hpText.setVisible(true).setPosition(o.x, y).setText(String(Math.max(1, Math.ceil(o.hp))));
   }
@@ -1201,10 +1242,14 @@ class GameScene extends Phaser.Scene {
       project(sl.x + SLAM_HALF_W, VIEW.near), project(sl.x - SLAM_HALF_W, VIEW.near),
     ].map((p) => new Phaser.Geom.Point(p.x, p.y));
     const pulse = 0.18 + 0.14 * Math.sin(this.elapsed * 30);
-    g.fillStyle(COLORS.horde, pulse + (1 - sl.t / sl.warn) * 0.2);
-    g.fillPoints(lane, true);
-    g.lineStyle(4, COLORS.horde, 0.9);
-    g.strokePoints(lane, true);
+    if (World3D.active) {
+      this.decals.push({ k: 'lane', x: sl.x, y0: top, y1: VIEW.near, w: SLAM_HALF_W * 2, a: pulse + 0.25 + (1 - sl.t / sl.warn) * 0.25 });
+    } else {
+      g.fillStyle(COLORS.horde, pulse + (1 - sl.t / sl.warn) * 0.2);
+      g.fillPoints(lane, true);
+      g.lineStyle(4, COLORS.horde, 0.9);
+      g.strokePoints(lane, true);
+    }
     if (sl.t > 0) return;
 
     this.slam = null;
@@ -1257,10 +1302,14 @@ class GameScene extends Phaser.Scene {
         const p = project(r.x + Math.cos(ang) * 80, r.y + Math.sin(ang) * 60);
         pts.push(new Phaser.Geom.Point(p.x, p.y));
       }
-      g.fillStyle(COLORS.horde, 0.2 + k * 0.35);
-      g.fillPoints(pts, true);
-      g.lineStyle(4, COLORS.horde, 0.9);
-      g.strokePoints(pts, true);
+      if (World3D.active) {
+        this.decals.push({ k: 'circle', x: r.x, y: r.y, rx: 80, ry: 80, a: 0.3 + k * 0.45 });
+      } else {
+        g.fillStyle(COLORS.horde, 0.2 + k * 0.35);
+        g.fillPoints(pts, true);
+        g.lineStyle(4, COLORS.horde, 0.9);
+        g.strokePoints(pts, true);
+      }
       if (r.t > 0) continue;
       this.rocks.splice(i, 1);
       r.img.destroy();
@@ -1377,6 +1426,7 @@ class GameScene extends Phaser.Scene {
       c.gate = p;
       // Shooting raises +/- cards, and makes the red divide and trap cards worse.
       c.shootable = p.kind === 'add' || p.kind === 'div' || p.kind === 'trap';
+      c.h3 = 75;
       c.startValue = p.value || 0;
       c.bg = this.add.graphics();
       c.label = this.add.text(0, -12, '', textStyle(68, '#ffffff', { fontStyle: 'italic' })).setOrigin(0.5);
@@ -1556,7 +1606,7 @@ class GameScene extends Phaser.Scene {
     const ratio = clamp((eff - 1) / (TUNING.maxSpeed - 1), 0, 1.5);
     const roadSpeed = 180 + eff * 95;
     this.roadScroll += roadSpeed * dt;
-    this.drawGround();
+    if (!World3D.active) this.drawGround();
     for (const t of this.trees) {
       t.y += roadSpeed * dt;
       if (t.y > VIEW.near + 200) t.y -= VIEW.near - VIEW.far + 400;
