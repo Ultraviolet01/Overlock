@@ -1333,7 +1333,11 @@ class GameScene extends Phaser.Scene {
     // At least the wave's base health, and at least about 8 seconds of the
     // squad's current firepower, so a huge squad still gets a real fight.
     const dps = this.squadPower() * this.hero.damage * this.s.dmgMult * this.fireMult(this.effSpeed()) / this.hero.interval;
-    b.maxHp = Math.max(900 * Math.pow(this.s.wave / TUNING.bossEvery, 1.6), dps * TUNING.bossSeconds);
+    // Each boss in the run is tougher: the first can be beaten before it
+    // reaches the squad, later ones carry more of the squad's firepower in health.
+    const nth = Math.max(1, Math.round(this.s.wave / TUNING.bossEvery));
+    const secs = Math.min(TUNING.bossSeconds, 7 + (nth - 1) * 3);
+    b.maxHp = Math.max(1500 * Math.pow(this.s.wave / TUNING.bossEvery, 1.7), dps * secs);
     b.hp = b.maxHp;
     b.dmgAcc = 0;
     b.lastNum = 0;
@@ -1380,7 +1384,7 @@ class GameScene extends Phaser.Scene {
       b.setVelocity(0, 0);
       b.smashT = (b.smashT === undefined ? 0 : b.smashT) - dt;
       if (b.smashT <= 0) {
-        b.smashT = 2.2;
+        b.smashT = 1.7;
         this.bossSmash(b);
       }
     }
@@ -1396,7 +1400,7 @@ class GameScene extends Phaser.Scene {
       if (b.slamTimer > 0) return;
       const warn = Math.max(0.75, 1.15 - this.s.wave * 0.02);
       this.slam = { x: this.squadX, t: warn, warn };
-      b.slamTimer = Math.max(2, 3.4 - this.s.wave * 0.05);
+      b.slamTimer = Math.max(2, 3.4 - this.s.wave * 0.05) * TUNING.bossAttackGap;
       Sfx.tone(180, 0.3, 'sawtooth', 0.08, 0, 120);
     }
     const sl = this.slam;
@@ -1444,7 +1448,7 @@ class GameScene extends Phaser.Scene {
   updateBoulders(b, dt) {
     b.atkTimer -= dt;
     if (b.atkTimer <= 0) {
-      b.atkTimer = Math.max(1.6, 2.7 - this.s.wave * 0.03);
+      b.atkTimer = Math.max(1.6, 2.7 - this.s.wave * 0.03) * TUNING.bossAttackGap;
       const xs = [this.squadX, 140 + Math.random() * 440, 140 + Math.random() * 440];
       xs.forEach((x, i) => {
         const img = this.add.image(x, LINE_Y, 'skull').setScale(2.6).setDepth(33);
@@ -1497,7 +1501,7 @@ class GameScene extends Phaser.Scene {
   updateBrood(b, dt) {
     b.atkTimer -= dt;
     if (b.atkTimer > 0) return;
-    b.atkTimer = Math.max(1.6, 2.6 - this.s.wave * 0.02);
+    b.atkTimer = Math.max(1.6, 2.6 - this.s.wave * 0.02) * TUNING.bossAttackGap;
     this.explode(this.burstRot, 20, b.x, b.y + 40);
     for (const off of [-90, 0, 90]) this.spawnEnemy('sprinter', clamp(b.x + off, 110, W - 110), b.y + 60);
     Sfx.tone(160, 0.25, 'square', 0.06, 0, 90);
@@ -1514,7 +1518,7 @@ class GameScene extends Phaser.Scene {
       for (const off of [-120, 120]) this.spawnEnemy('wraith', clamp(b.x + off, 110, W - 110), b.y + 40);
     } else if (b.immune && b.atkTimer <= 0) {
       b.immune = false;
-      b.atkTimer = Math.max(2.6, 4 - this.s.wave * 0.03);
+      b.atkTimer = Math.max(2.6, 4 - this.s.wave * 0.03) * TUNING.bossAttackGap;
     }
     if (b.immune) {
       b.setTint(0x7fd3ff);
@@ -1539,7 +1543,7 @@ class GameScene extends Phaser.Scene {
   bossSmash(b) {
     const first = !b.reached;
     b.reached = true;
-    const lost = Math.ceil(this.s.squad * 0.25) + 2;
+    const lost = Math.ceil(this.s.squad * 0.3) + 3;
     this.addSpeed(-2 * this.hero.hitLoss);
     this.explode(this.burstRed, 60, this.squadX, LINE_Y - 40);
     this.popNumber(this.squadX, LINE_Y - 250, '-' + lost, '#e0413a', 56);

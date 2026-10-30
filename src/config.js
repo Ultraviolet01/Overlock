@@ -35,11 +35,12 @@ const TUNING = {
   gateFall: 120,           // gate fall speed in world units per second
   speedClimb: 0.035,       // speed gained per second just by running; x1 to x5 in about two minutes
   overclockTime: 5,        // seconds of OVERCLOCK at max speed
-  bossTime: 14,            // seconds the boss needs to reach the squad
+  bossTime: 12,            // seconds the boss needs to reach the squad
+  bossAttackGap: 0.75,     // boss attacks come this much more often than the base timers
   squadCap: 9999,
   powerCurve: 0.4,         // firepower grows as squad^0.4, so 1000 wizards hit ~8x harder than 5
   hpCurve: 0.2,            // enemy health grows with the square of the wave times this
-  bossSeconds: 10,         // a boss has at least this many seconds of the squad's firepower in health
+  bossSeconds: 14,         // a boss has at least this many seconds of the squad's firepower in health
   biteShare: 0.015,        // each bite also takes this share of the squad per point of bite
   mulSquadMax: 400,        // x2/x3 gates stop appearing once the squad is this big
   extraEvery: 3,           // one extra enemy per spawn for every 3 waves
