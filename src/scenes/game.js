@@ -139,6 +139,7 @@ class GameScene extends Phaser.Scene {
     this.barrelTimer = 14;
     this.elapsed = 0;
     this.gateRows = [];
+    this.fadingCards = [];
     this.drag = null;
     this.units = 0;
     this.spacing = 26;
@@ -245,7 +246,16 @@ class GameScene extends Phaser.Scene {
     this.trees.forEach((o) => add(o));
     this.streaks.forEach((o) => add(o));
     this.embers.forEach((o) => add(o));
-    this.gateRows.forEach((row) => row.cards.forEach((c) => add(c)));
+    // In 3D the gates are standing models; the flat cards only draw in 2D.
+    const gateCard = (c) => {
+      if (!is3d) return add(c);
+      if (c.visible) {
+        hidden.push(c);
+        c.visible = false;
+      }
+    };
+    this.gateRows.forEach((row) => row.cards.forEach(gateCard));
+    this.fadingCards.forEach(gateCard);
     this.barrels.getChildren().forEach((o) => { add(o, true); add(o.hpText); });
     this.enemies.getChildren().forEach((o) => { add(o, true, true); add(o.hpText); });
     this.bosses.getChildren().forEach((o) => add(o, true));
@@ -885,10 +895,10 @@ class GameScene extends Phaser.Scene {
       for (const row of this.gateRows) {
         if (row.done || b.y > row.y + CARD_H / 2 || b.y < row.y - CARD_H / 2) continue;
         const card = row.cards[b.x < W / 2 ? 0 : 1];
-        if (card && card.shootable) {
+        // Bolts fly on through the gate, counting once per gate on the way.
+        if (card && card.shootable && b.gateRow !== row) {
+          b.gateRow = row;
           this.hitCard(card);
-          this.killBullet(b);
-          break;
         }
       }
     }
@@ -1570,8 +1580,13 @@ class GameScene extends Phaser.Scene {
         const chosen = row.cards[this.squadX < W / 2 ? 0 : 1];
         const other = row.cards[this.squadX < W / 2 ? 1 : 0];
         this.applyGate(chosen.gate);
-        this.tweens.add({ targets: chosen, scale: 1.25, alpha: 0, duration: 260, onComplete: () => chosen.destroy() });
-        this.tweens.add({ targets: other, alpha: 0, duration: 200, onComplete: () => other.destroy() });
+        this.fadingCards.push(chosen, other);
+        const gone = (c) => {
+          Phaser.Utils.Array.Remove(this.fadingCards, c);
+          c.destroy();
+        };
+        this.tweens.add({ targets: chosen, scale: 1.25, alpha: 0, duration: 260, onComplete: () => gone(chosen) });
+        this.tweens.add({ targets: other, alpha: 0, duration: 200, onComplete: () => gone(other) });
         this.gateRows.splice(i, 1);
         if (this.s.over) return;
       }

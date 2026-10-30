@@ -664,6 +664,7 @@ const World3D = {
     this.trees.forEach((tr, i) => {
       tr.position.z = ((-32 + (i / 40) * span + scroll * U) % span + span) % span - 32;
     });
+    this.syncGates(null);
     this.drawDecals([]);
     this.renderer.render(this.scene, this.camera);
   },
@@ -708,8 +709,114 @@ const World3D = {
       tr.position.z = ((-32 + (i / 40) * span + scroll) % span + span) % span - 32;
     });
 
+    this.syncGates(g);
     this.drawDecals(g.decals || []);
     this.renderer.render(this.scene, this.camera);
+  },
+
+  // Last War style gates: an upright glass panel between two posts with a
+  // crossbar, standing on the road. The value sign faces the camera so it
+  // stays readable from above.
+  buildGate() {
+    const w = 3.3;
+    const h = 1.7;
+    const g = new THREE.Group();
+    const glassMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false });
+    const glass = new THREE.Mesh(new THREE.PlaneGeometry(w, h), glassMat);
+    glass.position.y = h / 2;
+    g.add(glass);
+    const frameMat = new THREE.MeshLambertMaterial({ color: 0x2b2f36, transparent: true });
+    const trimMat = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true });
+    [-1, 1].forEach((sd) => {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, h + 0.25, 0.16), frameMat);
+      post.position.set(sd * w / 2, (h + 0.25) / 2, 0);
+      g.add(post);
+    });
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(w + 0.16, 0.16, 0.18), trimMat);
+    bar.position.y = h + 0.1;
+    g.add(bar);
+    const base = new THREE.Mesh(new THREE.BoxGeometry(w + 0.16, 0.08, 0.2), trimMat);
+    base.position.y = 0.04;
+    g.add(base);
+    const cv = document.createElement('canvas');
+    cv.width = 512;
+    cv.height = 256;
+    const tex = new THREE.CanvasTexture(cv);
+    tex.encoding = THREE.sRGBEncoding;
+    const signMat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.9, w * 0.45), signMat);
+    sign.position.y = h * 0.55;
+    sign.renderOrder = 2;
+    g.add(sign);
+    g.userData = { glassMat, frameMat, trimMat, signMat, sign, cv, tex, shown: null };
+    this.scene.add(g);
+    return g;
+  },
+
+  drawGateSign(m, info) {
+    const u = m.userData;
+    const x = u.cv.getContext('2d');
+    const hex = '#' + info.color.toString(16).padStart(6, '0');
+    x.clearRect(0, 0, 512, 256);
+    x.textAlign = 'center';
+    x.textBaseline = 'middle';
+    x.lineJoin = 'round';
+    x.font = 'italic 150px ' + FONT;
+    x.lineWidth = 22;
+    x.strokeStyle = '#0a0f0e';
+    x.strokeText(info.text, 256, 100);
+    x.fillStyle = '#ffffff';
+    x.fillText(info.text, 256, 100);
+    x.font = '46px ' + FONT;
+    x.lineWidth = 12;
+    x.strokeText(info.sub, 256, 212);
+    x.fillStyle = hex;
+    x.fillText(info.sub, 256, 212);
+    u.tex.needsUpdate = true;
+    u.glassMat.color.setHex(info.color);
+    u.trimMat.color.setHex(info.color);
+  },
+
+  // One standing gate per card on the road; gates whose card is gone go back to the pool.
+  syncGates(g) {
+    const map = this.gates || (this.gates = new Map());
+    const pool = this.gatePool || (this.gatePool = []);
+    const cards = [];
+    if (g) {
+      g.gateRows.forEach((r) => r.cards.forEach((c) => cards.push(c)));
+      g.fadingCards.forEach((c) => cards.push(c));
+    }
+    const seen = new Set(cards);
+    map.forEach((m, c) => {
+      if (seen.has(c)) return;
+      m.visible = false;
+      pool.push(m);
+      map.delete(c);
+    });
+    cards.forEach((c) => {
+      let m = map.get(c);
+      if (!m) {
+        m = pool.pop() || this.buildGate();
+        m.userData.shown = null;
+        map.set(c, m);
+      }
+      m.visible = true;
+      const info = g.cardInfo(c.gate);
+      const key = info.text + '|' + info.sub + '|' + info.color;
+      if (m.userData.shown !== key) {
+        this.drawGateSign(m, info);
+        m.userData.shown = key;
+      }
+      m.position.set((c.x - W / 2) * U, 0, (c.y - LINE_Y) * U);
+      m.scale.setScalar(c.scaleX);
+      const a = c.alpha;
+      const u = m.userData;
+      u.glassMat.opacity = 0.35 * a;
+      u.signMat.opacity = a;
+      u.frameMat.opacity = a;
+      u.trimMat.opacity = a;
+      u.sign.lookAt(this.camera.position);
+    });
   },
 
   // Red ground markings for boss attacks: lanes and circles.
