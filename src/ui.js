@@ -289,7 +289,7 @@ function openHelp(scene, onClose) {
   const rows = [
     [() => scene.add.image(0, 0, 'knight').setScale(0.42), 'STEER', 'Drag left or right. Your wizards cast spells on their own.'],
     [() => scene.add.image(0, 0, 'icon_flame').setScale(1.1), 'SPEED IS EVERYTHING', 'The run speeds up as you go. Bites slow you. Speed multiplies score. x5 = OVERCLOCK.'],
-    [() => miniCard(scene, 0, 0, '+8', COLORS.gold), 'GOLD AND BLUE GATES', 'Gold adds wizards. Blue hides it in quick math: solve it before you pass!'],
+    [() => miniCard(scene, 0, 0, '+8', COLORS.gold), 'GOLD AND BLUE GATES', 'Gold adds wizards. Blue hides it in quick math: solve it, or shoot it to reveal it.'],
     [() => miniCard(scene, 0, 0, '-30', COLORS.bad), 'RED GATES', 'They take wizards. Shoot them: the number climbs, turns gold and gives wizards.'],
     [() => scene.add.image(0, 0, 'barrel').setScale(0.75), 'RUNE BARRELS', 'Break one for an upgrade, or it crashes into you.'],
     [() => scene.add.image(0, 0, 'champion').setScale(0.36), 'ARCHMAGES', 'Every 10 wizards merge into one archmage.'],

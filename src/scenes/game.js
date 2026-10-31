@@ -1670,8 +1670,11 @@ class GameScene extends Phaser.Scene {
     switch (g.kind) {
       case 'add': {
         if (g.expr) {
-          const bonus = Math.floor(g.value - g.base + 1e-6);
-          return { text: g.expr + (bonus > 0 ? ' +' + bonus : ''), sub: 'SOLVE IT: WIZARDS', color: COLORS.math, icon: 'knight' };
+          // Unshot, it is a puzzle. Once shot, it shows the live answer and
+          // turns red or gold like any other wizard gate.
+          if (!g.shot) return { text: g.expr, sub: 'SOLVE IT: WIZARDS', color: COLORS.math, icon: 'knight' };
+          const t = this.gateTotal(g);
+          return { text: '= ' + (t >= 0 ? '+' : '') + t, sub: t >= 0 ? 'ADD WIZARDS' : 'LOSE WIZARDS', color: t >= 0 ? COLORS.gold : COLORS.bad, icon: 'knight' };
         }
         const v = Math.round(g.value);
         return { text: (v >= 0 ? '+' : '') + v, sub: v > 0 ? 'ADD WIZARDS' : 'LOSE WIZARDS', color: v > 0 ? COLORS.gold : COLORS.bad, icon: 'knight' };
@@ -1708,6 +1711,7 @@ class GameScene extends Phaser.Scene {
   hitCard(c) {
     const g = c.gate;
     if (g.kind === 'add') {
+      g.shot = true;
       // Big red numbers climb faster per hit, so they can be turned around.
       const start = c.startValue;
       const step = start < 0 ? 0.34 + -start * 0.012 : 0.34;
