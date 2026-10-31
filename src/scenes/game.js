@@ -201,6 +201,12 @@ class GameScene extends Phaser.Scene {
 
     this.events.on('prerender', this.projectAll, this);
     this.events.on('render', this.restoreAll, this);
+    // Scene events outlive a restart; without this, RUN AGAIN would project
+    // twice per frame and leave the squad hidden.
+    this.events.once('shutdown', () => {
+      this.events.off('prerender', this.projectAll, this);
+      this.events.off('render', this.restoreAll, this);
+    });
   }
 
   // Before drawing, move every world object to its projected screen spot and
