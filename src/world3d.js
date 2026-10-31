@@ -621,12 +621,14 @@ const World3D = {
     if (o.isBoss && o.immune) c = 0x2f7fb0;
     else if (o.hitFlash > 0) c = unit ? 0xc8201a : 0xffffff;
     else if (unit && o.glow) c = 0x0b4a68;
+    else if (o.frozen) c = 0x1f5f88;
     const flash = c !== 0;
     if (c !== m.userData.flashing) {
       m.userData.flashing = c;
+      const tint = !flash ? 0xffffff : o.hitFlash > 0 ? 0xff9090 : 0x9fdcff;
       m.userData.mats.forEach((mt) => {
         if (mt.emissive) mt.emissive.setHex(flash ? c : (mt.userData.baseEmissive || 0));
-        else if (m.userData.billboard) mt.color.setHex(flash ? 0xff9090 : 0xffffff);
+        else if (m.userData.billboard) mt.color.setHex(tint);
       });
     }
     return m;

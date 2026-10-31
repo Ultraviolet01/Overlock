@@ -556,7 +556,7 @@ class GameScene extends Phaser.Scene {
   }
 
   hordeMult() {
-    return (1 + (this.s.wave - 1) * 0.09) * (this.s.slowTimer > 0 ? 0.45 : 1);
+    return (1 + (this.s.wave - 1) * 0.09) * (this.s.slowTimer > 0 ? 0.15 : 1);
   }
 
   addSpeed(delta) {
@@ -1058,7 +1058,7 @@ class GameScene extends Phaser.Scene {
       this.spawnEnemy(type, x);
     }
     // Later waves send extra enemies alongside each spawn.
-    const extra = Math.min(2, Math.floor(w / TUNING.extraEvery));
+    const extra = this.s.bossActive ? 0 : Math.min(2, Math.floor(w / TUNING.extraEvery));
     for (let i = 0; i < extra; i++) this.spawnEnemy(w >= 3 && Math.random() < 0.4 ? 'sprinter' : 'walker', 130 + Math.random() * (W - 260));
   }
 
@@ -1101,11 +1101,12 @@ class GameScene extends Phaser.Scene {
         e.latched = true;
         e.biteT = 0;
       }
+      e.frozen = this.s.slowTimer > 0;
       if (e.latched) {
         e.y = front;
         vy = 0;
-        vx = clamp((this.squadX + (e.wobble % 1 - 0.5) * this.squadSpread() - e.x) * 4, -400, 400);
-        e.biteT -= dt;
+        vx = clamp((this.squadX + (e.wobble % 1 - 0.5) * this.squadSpread() - e.x) * 4, -400, 400) * (e.frozen ? 0.15 : 1);
+        if (!e.frozen) e.biteT -= dt;
         if (e.biteT <= 0) {
           e.biteT = 0.9;
           this.bite(e);
@@ -1138,6 +1139,8 @@ class GameScene extends Phaser.Scene {
     if (e.hitFlash > 0) {
       e.hitFlash -= this.game.loop.delta / 1000;
       e.setTintFill(0xffffff);
+    } else if (e.frozen) {
+      e.setTint(0x9fdcff);
     } else if (e.isTinted) {
       e.clearTint();
     }
@@ -1146,7 +1149,7 @@ class GameScene extends Phaser.Scene {
   bite(e) {
     // Big squads lose a share of themselves, so size alone is no shield.
     const lost = Math.max(e.def.bite * Math.ceil(this.s.wave / 3), Math.ceil(this.s.squad * TUNING.biteShare * e.def.bite));
-    this.addSpeed(-0.3 * e.def.bite * this.hero.hitLoss);
+    this.addSpeed(-0.15 * e.def.bite * this.hero.hitLoss);
     this.explode(this.burstRed, 14, e.x, LINE_Y - 10);
     this.popNumber(this.squadX, LINE_Y - 230, '-' + lost, '#e0413a', 40);
     this.shake(120, 0.006);
@@ -1345,8 +1348,8 @@ class GameScene extends Phaser.Scene {
     // Each boss in the run is tougher: the first can be beaten before it
     // reaches the squad, later ones carry more of the squad's firepower in health.
     const nth = Math.max(1, Math.round(this.s.wave / TUNING.bossEvery));
-    const secs = Math.min(TUNING.bossSeconds, 7 + (nth - 1) * 3);
-    b.maxHp = Math.max(1500 * Math.pow(this.s.wave / TUNING.bossEvery, 1.7), dps * secs);
+    const secs = Math.min(TUNING.bossSeconds, 5 + (nth - 1) * 2.5);
+    b.maxHp = Math.max(1000 * Math.pow(this.s.wave / TUNING.bossEvery, 1.7), dps * secs);
     b.hp = b.maxHp;
     b.dmgAcc = 0;
     b.lastNum = 0;
@@ -1371,29 +1374,34 @@ class GameScene extends Phaser.Scene {
       this.bossNum.setVisible(false);
       return;
     }
-    const v = (b.endY - b.startY) / TUNING.bossTime * (this.s.slowTimer > 0 ? 0.45 : 1);
+    const frozen = this.s.slowTimer > 0;
+    b.frozen = frozen;
+    const v = (b.endY - b.startY) / TUNING.bossTime * (frozen ? 0 : 1);
     b.setVelocity(Math.sin(this.elapsed * 1.5) * 40, v);
     b.x = clamp(b.x, 190, W - 190);
     this.applyHitFlash(b);
     b.setScale(b.baseScale * (1 + Math.sin(this.elapsed * 6) * 0.02));
 
     this.slamGfx.clear();
-    if (b.def.attack === 'slam') this.updateSlam(b, dt);
-    else if (b.def.attack === 'boulders') this.updateBoulders(b, dt);
-    else if (b.def.attack === 'brood') this.updateBrood(b, dt);
-    else if (b.def.attack === 'shield') this.updateShield(b, dt);
+    // A frozen boss holds still: no attacks and no smashing.
+    if (!frozen) {
+      if (b.def.attack === 'slam') this.updateSlam(b, dt);
+      else if (b.def.attack === 'boulders') this.updateBoulders(b, dt);
+      else if (b.def.attack === 'brood') this.updateBrood(b, dt);
+      else if (b.def.attack === 'shield') this.updateShield(b, dt);
+    }
     if (this.s.over || !b.active) return;
 
     const hpRatio = clamp(b.hp / b.maxHp, 0, 1);
     const reach = clamp((b.y - b.startY) / (b.endY - b.startY), 0, 1);
     this.drawBossBar(hpRatio, reach, b.hp);
 
-    if (b.y >= b.endY) {
+    if (b.y >= b.endY && !frozen) {
       b.y = b.endY;
       b.setVelocity(0, 0);
       b.smashT = (b.smashT === undefined ? 0 : b.smashT) - dt;
       if (b.smashT <= 0) {
-        b.smashT = 1.7;
+        b.smashT = 2;
         this.bossSmash(b);
       }
     }
@@ -1440,8 +1448,8 @@ class GameScene extends Phaser.Scene {
     Sfx.noise(0.4, 0.2, 0, 300, 'lowpass');
 
     if (Math.abs(this.squadX - sl.x) < SLAM_HALF_W + this.squadSpread() * 0.4) {
-      const lost = Math.ceil(this.s.squad * 0.2) + 2;
-      this.addSpeed(-0.8 * this.hero.hitLoss);
+      const lost = Math.ceil(this.s.squad * 0.15) + 2;
+      this.addSpeed(-0.4 * this.hero.hitLoss);
       this.popNumber(this.squadX, LINE_Y - 250, 'SLAMMED -' + lost, '#e0413a', 40);
       vibrate(120);
       Sfx.bite();
@@ -1495,8 +1503,8 @@ class GameScene extends Phaser.Scene {
       this.shake(140, 0.01);
       Sfx.noise(0.3, 0.18, 0, 400, 'lowpass');
       if (Math.abs(this.squadX - r.x) < 80 + this.squadSpread() * 0.5 && Math.abs(r.y - LINE_Y) < 90) {
-        const lost = Math.ceil(this.s.squad * 0.12) + 2;
-        this.addSpeed(-0.6 * this.hero.hitLoss);
+        const lost = Math.ceil(this.s.squad * 0.08) + 2;
+        this.addSpeed(-0.3 * this.hero.hitLoss);
         this.popNumber(this.squadX, LINE_Y - 250, 'CRUSHED -' + lost, '#e0413a', 40);
         vibrate(100);
         Sfx.bite();
@@ -1552,8 +1560,8 @@ class GameScene extends Phaser.Scene {
   bossSmash(b) {
     const first = !b.reached;
     b.reached = true;
-    const lost = Math.ceil(this.s.squad * 0.3) + 3;
-    this.addSpeed(-2 * this.hero.hitLoss);
+    const lost = Math.ceil(this.s.squad * 0.25) + 2;
+    this.addSpeed(-1 * this.hero.hitLoss);
     this.explode(this.burstRed, 60, this.squadX, LINE_Y - 40);
     this.popNumber(this.squadX, LINE_Y - 250, '-' + lost, '#e0413a', 56);
     this.shake(500, 0.02);
@@ -1735,7 +1743,8 @@ class GameScene extends Phaser.Scene {
         s.boltMult = Math.min(2.5, s.boltMult * 1.5);
         break;
       case 'slow':
-        msg = 'HORDE SLOWED';
+        msg = 'HORDE FROZEN!';
+        this.cameras.main.flash(180, 120, 200, 255);
         s.slowTimer = 5;
         break;
     }
@@ -1871,8 +1880,9 @@ class GameScene extends Phaser.Scene {
     this.speedLabel.setText(oc ? 'OVERCLOCK!' : 'SPEED').setColor(oc ? '#4fe0ff' : '#ffffff');
     this.multText.setText('SCORE x' + this.scoreMult());
     // Screen edges glow from x4 up, and pulse hard during OVERCLOCK.
-    this.edgeGlow.setTint(oc ? 0x4fe0ff : 0xff8a3c);
-    this.edgeGlow.setAlpha(oc ? 0.75 + 0.25 * Math.sin(this.elapsed * 14) : clamp((ratio - 0.7) / 0.3, 0, 1) * 0.6);
+    const frozen = this.s.slowTimer > 0;
+    this.edgeGlow.setTint(oc ? 0x4fe0ff : frozen ? 0x9fdcff : 0xff8a3c);
+    this.edgeGlow.setAlpha(oc ? 0.75 + 0.25 * Math.sin(this.elapsed * 14) : frozen ? 0.65 : clamp((ratio - 0.7) / 0.3, 0, 1) * 0.6);
     this.speedText.setScale(1 + ratio * 0.12 + (this.s.surgeTimer > 0 ? 0.1 : 0));
 
     // Top-left cluster.
@@ -1895,7 +1905,7 @@ class GameScene extends Phaser.Scene {
     this.bossStrip.set(this.s.bossActive ? nextName + ' ATTACKING' : toBoss === 1 ? nextName + ' NEXT WAVE' : nextName + ' IN ' + toBoss + ' WAVES');
 
     const status = [];
-    if (this.s.slowTimer > 0) status.push('HORDE SLOW ' + Math.ceil(this.s.slowTimer) + 's');
+    if (this.s.slowTimer > 0) status.push('HORDE FROZEN ' + Math.ceil(this.s.slowTimer) + 's');
     if (this.s.surgeTimer > 0) status.push('SURGE ' + Math.ceil(this.s.surgeTimer) + 's');
     if (this.s.boltMult > 1) status.push('SPELL POWER x' + this.s.boltMult.toFixed(1));
     if (this.s.dmgMult > 1) status.push('SPELL DAMAGE x' + this.s.dmgMult.toFixed(1));
