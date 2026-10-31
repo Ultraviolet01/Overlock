@@ -14,7 +14,7 @@ A portrait, one-thumb horde shooter built for Slapjam AI 2. The jam theme is **S
   - Gold gates add or multiply wizards: `+8`, `x2`, `x3`.
   - Cyan gates boost spell power or slow the horde.
   - Red gates take wizards (`-30`).
-  - Blue math gates hide the number in a quick sum (`7 × 8`, `23 - 9`, `-6 × 4`). Solve it before the gate reaches you; the answer can be positive or negative. Shooting one reveals the live answer, which climbs and turns gold once it passes zero.
+  - Blue math gates hide the number in a quick sum (`7 × 8`, `23 - 9`, `-6 × 4`). Solve it before the gate reaches you; the answer can be positive or negative. Shooting does not change a math gate.
 - Shoot the wizard gates to raise their number. A red `-30` climbs toward zero, turns gold, and then gives wizards.
 - Every 10 wizards merge into one archmage, so a squad of hundreds stays readable.
 - Rune barrels roll down a lane. Shoot one open for piercing bolts, extra spell damage or more wizards. If you don't break it and it reaches your squad, it crashes into it.

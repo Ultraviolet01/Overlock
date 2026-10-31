@@ -1628,9 +1628,10 @@ class GameScene extends Phaser.Scene {
       c.shootable = p.kind === 'add';
       c.h3 = 0;
       c.startValue = p.value || 0;
+      // Math gates are a fixed puzzle: shooting does not change them.
       if (p.kind === 'add' && this.s.wave >= 2 && Math.random() < TUNING.mathChance) {
         p.expr = this.mathFor(p.value);
-        p.base = p.value;
+        c.shootable = false;
       }
       c.bg = this.add.graphics();
       c.icon = this.add.image(-CARD_W / 2 + 30, -CARD_H / 2 + 28, 'dot').setScale(0.7);
@@ -1661,21 +1662,10 @@ class GameScene extends Phaser.Scene {
     return pickMul ? forms[r(0, forms.length - 1)] : sums[r(0, sums.length - 1)];
   }
 
-  // Wizards a +/- gate gives right now. Math gates add whole bonus points from shooting.
-  gateTotal(g) {
-    return g.expr ? g.base + Math.floor(g.value - g.base + 1e-6) : Math.round(g.value);
-  }
-
   cardInfo(g) {
     switch (g.kind) {
       case 'add': {
-        if (g.expr) {
-          // Unshot, it is a puzzle. Once shot, it shows the live answer and
-          // turns red or gold like any other wizard gate.
-          if (!g.shot) return { text: g.expr, sub: 'SOLVE IT: WIZARDS', color: COLORS.math, icon: 'knight' };
-          const t = this.gateTotal(g);
-          return { text: '= ' + (t >= 0 ? '+' : '') + t, sub: t >= 0 ? 'ADD WIZARDS' : 'LOSE WIZARDS', color: t >= 0 ? COLORS.gold : COLORS.bad, icon: 'knight' };
-        }
+        if (g.expr) return { text: g.expr, sub: 'SOLVE IT: WIZARDS', color: COLORS.math, icon: 'knight' };
         const v = Math.round(g.value);
         return { text: (v >= 0 ? '+' : '') + v, sub: v > 0 ? 'ADD WIZARDS' : 'LOSE WIZARDS', color: v > 0 ? COLORS.gold : COLORS.bad, icon: 'knight' };
       }
@@ -1711,7 +1701,6 @@ class GameScene extends Phaser.Scene {
   hitCard(c) {
     const g = c.gate;
     if (g.kind === 'add') {
-      g.shot = true;
       // Big red numbers climb faster per hit, so they can be turned around.
       const start = c.startValue;
       const step = start < 0 ? 0.34 + -start * 0.012 : 0.34;
@@ -1763,7 +1752,7 @@ class GameScene extends Phaser.Scene {
     let msg = '';
     switch (g.kind) {
       case 'add': {
-        const v = this.gateTotal(g);
+        const v = Math.round(g.value);
         good = v >= 0;
         msg = (g.expr ? '= ' : '') + (v >= 0 ? '+' : '') + v;
         this.setSquad(s.squad + v);
