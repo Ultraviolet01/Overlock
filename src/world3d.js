@@ -879,7 +879,8 @@ const World3D = {
     x.textAlign = 'center';
     x.textBaseline = 'middle';
     x.lineJoin = 'round';
-    x.font = 'italic 150px ' + FONT;
+    const len = info.text.length;
+    x.font = 'italic ' + (len > 5 ? Math.max(66, Math.round(150 * 5 / len)) : 150) + 'px ' + FONT;
     x.lineWidth = 22;
     x.strokeStyle = '#0a0f0e';
     x.strokeText(info.text, 256, 100);

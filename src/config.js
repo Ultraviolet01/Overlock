@@ -21,6 +21,7 @@ const COLORS = {
   ember: 0xff8a3d,
   bad: 0xe0413a,
   speedGate: 0x4fe0c8,
+  math: 0x5b9bd5,          // math gates: neutral so the color does not give the answer away
   text: '#e8f4f0',
   textDim: '#8fa8a0',
 };
@@ -42,6 +43,7 @@ const TUNING = {
   hpCurve: 0.26,            // enemy health grows with the square of the wave times this
   bossSeconds: 14,         // a boss has at least this many seconds of the squad's firepower in health
   biteShare: 0.015,        // each bite also takes this share of the squad per point of bite
+  mathChance: 0.6,         // share of wizard gates shown as a quick sum, from wave 2
   mulSquadMax: 400,        // x2/x3 gates stop appearing once the squad is this big
   extraEvery: 4,           // one extra enemy per spawn every 4 waves, at most 2
   maxEnemies: 45,          // most enemies on the road at once

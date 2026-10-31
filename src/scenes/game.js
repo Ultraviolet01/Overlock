@@ -1628,6 +1628,10 @@ class GameScene extends Phaser.Scene {
       c.shootable = p.kind === 'add';
       c.h3 = 0;
       c.startValue = p.value || 0;
+      if (p.kind === 'add' && this.s.wave >= 2 && Math.random() < TUNING.mathChance) {
+        p.expr = this.mathFor(p.value);
+        p.base = p.value;
+      }
       c.bg = this.add.graphics();
       c.icon = this.add.image(-CARD_W / 2 + 30, -CARD_H / 2 + 28, 'dot').setScale(0.7);
       c.label = this.add.text(0, -16, '', textStyle(72, '#ffffff', { fontStyle: 'italic' })).setOrigin(0.5);
@@ -1639,9 +1643,36 @@ class GameScene extends Phaser.Scene {
     this.gateRows.push(row);
   }
 
+  // A quick sum whose answer is v: a product when v has small factors,
+  // otherwise an addition or subtraction.
+  mathFor(v) {
+    const r = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
+    const forms = [];
+    for (let a = 2; a <= 9; a++) {
+      const b = v / a;
+      if (Number.isInteger(b) && Math.abs(b) >= 2 && Math.abs(b) <= 12) forms.push(Math.random() < 0.5 ? a + ' × ' + b : b + ' × ' + a);
+    }
+    const pm = (a, b) => a + (b >= 0 ? ' + ' + b : ' - ' + -b);
+    const a1 = r(2, Math.max(4, Math.abs(v) + 6)) * (v < 0 && Math.random() < 0.5 ? -1 : 1);
+    const sums = [pm(a1, v - a1)];
+    const a2 = v + r(3, 15);
+    sums.push(a2 + ' - ' + (a2 - v));
+    const pickMul = forms.length && Math.random() < 0.45;
+    return pickMul ? forms[r(0, forms.length - 1)] : sums[r(0, sums.length - 1)];
+  }
+
+  // Wizards a +/- gate gives right now. Math gates add whole bonus points from shooting.
+  gateTotal(g) {
+    return g.expr ? g.base + Math.floor(g.value - g.base + 1e-6) : Math.round(g.value);
+  }
+
   cardInfo(g) {
     switch (g.kind) {
       case 'add': {
+        if (g.expr) {
+          const bonus = Math.floor(g.value - g.base + 1e-6);
+          return { text: g.expr + (bonus > 0 ? ' +' + bonus : ''), sub: 'SOLVE IT: WIZARDS', color: COLORS.math, icon: 'knight' };
+        }
         const v = Math.round(g.value);
         return { text: (v >= 0 ? '+' : '') + v, sub: v > 0 ? 'ADD WIZARDS' : 'LOSE WIZARDS', color: v > 0 ? COLORS.gold : COLORS.bad, icon: 'knight' };
       }
@@ -1669,7 +1700,7 @@ class GameScene extends Phaser.Scene {
     if (c.icon && info.icon) {
       c.icon.setTexture(info.icon).setScale(info.icon === 'knight' ? 0.32 : 0.55);
     }
-    c.label.setText(info.text);
+    c.label.setText(info.text).setFontSize(info.text.length > 5 ? Math.max(34, Math.round(72 * 5 / info.text.length)) : 72);
     c.sub.setText(info.sub);
     c.shownText = info.text;
   }
@@ -1728,9 +1759,9 @@ class GameScene extends Phaser.Scene {
     let msg = '';
     switch (g.kind) {
       case 'add': {
-        const v = Math.round(g.value);
+        const v = this.gateTotal(g);
         good = v >= 0;
-        msg = (v >= 0 ? '+' : '') + v;
+        msg = (g.expr ? '= ' : '') + (v >= 0 ? '+' : '') + v;
         this.setSquad(s.squad + v);
         break;
       }
